@@ -1,22 +1,38 @@
 package server
 
 import (
-	"net/http"
+	"log"
+
+	"github.com/Andres09xZ/latacunga_clean_app/internal/handlers"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-
+// Start arranca el servidor Gin y registra handlers mínimos.
 func Start() {
-	auth_server := gin.Default()
+	r := gin.Default()
 
-	auth_server.GET("/health", func(c *gin.Context){
-		c.JSON(http.StatusOK, gin.H{"status": "Servidor de autenticacion de usuarios levantado"})
-	})
+	// Health
+	r.GET("/health", handlers.HealthHandler)
+	r.GET("/hello-world", handlers.HelloHandler)
 
-	auth_server.GET("/hello-world", func(c *gin.Context){
-		c.JSON(http.StatusOK, gin.H{"message": "Hello, World!"})
-	})
+	// Auth routes
+	authGroup := r.Group("/api/v1/auth")
+	{
+		authGroup.POST("/register", handlers.Register)
+		authGroup.POST("/login", handlers.Login)
+		// OTP endpoints for citizen users
+		authGroup.POST("/otp/send", handlers.SendOTP)
+		authGroup.POST("/otp/verify", handlers.VerifyOTP)
+	}
 
-	auth_server.Run(":8080") // Escucha en el puerto 8080
+	// Swagger UI (requiere generar docs con `swag init`)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	addr := ":8080"
+	log.Printf("starting auth service on %s", addr)
+	if err := r.Run(addr); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
 }
-
