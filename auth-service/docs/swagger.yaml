@@ -24,11 +24,18 @@ definitions:
       password:
         minLength: 6
         type: string
+      role:
+        description: only admin or operator allowed here
+        enum:
+        - admin
+        - operator
+        type: string
       telephone_number:
         type: string
     required:
     - email
     - password
+    - role
     type: object
   handlers.sendOTPRequest:
     properties:
@@ -47,6 +54,37 @@ definitions:
     - code
     - phone
     type: object
+  models.User:
+    properties:
+      birthday:
+        description: usa time.Time para fechas
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      dni:
+        type: string
+      email:
+        description: Make Email and PasswordHash nullable so OTP-only users can have
+          NULL values
+        type: string
+      id:
+        type: integer
+      id_user:
+        description: Identificador adicional de usuario
+        type: string
+      name:
+        type: string
+      phone_verified:
+        type: boolean
+      role:
+        type: string
+      telephone_number:
+        type: string
+      updated_at:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -56,6 +94,31 @@ info:
   title: Auth Service API
   version: "1.0"
 paths:
+  /api/v1/admin/users:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve a list of all users in the system. Requires admin role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.User'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List all users
+      tags:
+      - Users
   /api/v1/auth/login:
     post:
       consumes:
@@ -209,6 +272,35 @@ paths:
               type: string
             type: object
       summary: Register a new user
+      tags:
+      - Auth
+  /api/v1/auth/validate-token:
+    post:
+      consumes:
+      - application/json
+      description: Validate a JWT token and return claims if valid. Used by other
+        services.
+      parameters:
+      - description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Validate JWT token
       tags:
       - Auth
 swagger: "2.0"

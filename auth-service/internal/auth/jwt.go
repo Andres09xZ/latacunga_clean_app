@@ -17,6 +17,7 @@ var (
 type Claims struct {
 	UserID string `json:"user_id"`
 	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -41,6 +42,7 @@ func GenerateTokens(userID, email, role string) (string, string, error) {
 	accessClaims := Claims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(AccessExpiry()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -56,6 +58,7 @@ func GenerateTokens(userID, email, role string) (string, string, error) {
 	refreshClaims := Claims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(RefreshExpiry()),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -72,11 +75,8 @@ func GenerateTokens(userID, email, role string) (string, string, error) {
 
 // ValidateToken valida y parsea un token JWT retornando las claims
 func ValidateToken(tokenStr string) (*Claims, error) {
-	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
-		// Verificar método de firma
-		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrTokenUnverifiable
-		}
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{"HS256"}))
+	token, err := parser.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		return jwtSecret, nil
 	})
 	if err != nil {

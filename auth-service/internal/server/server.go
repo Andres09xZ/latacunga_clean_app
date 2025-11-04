@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/Andres09xZ/latacunga_clean_app/internal/handlers"
+	"github.com/Andres09xZ/latacunga_clean_app/middleware"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -25,8 +26,14 @@ func Start() {
 		// OTP endpoints for citizen users
 		authGroup.POST("/otp/send", handlers.SendOTP)
 		authGroup.POST("/otp/verify", handlers.VerifyOTP)
+		authGroup.POST("/validate-token", handlers.ValidateToken) // for service-to-service validation
 	}
 
+	admin := r.Group("/api/v1/admin")
+	admin.Use(middleware.JWTAuth(), middleware.RequireRole("admin"))
+	{
+		admin.GET("/users", handlers.ListUsers)
+	}
 	// Swagger UI (requiere generar docs con `swag init`)
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

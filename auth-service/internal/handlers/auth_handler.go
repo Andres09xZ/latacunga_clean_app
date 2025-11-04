@@ -341,3 +341,34 @@ func generateOTPCode() string {
 	}
 	return code
 }
+
+// ValidateToken valida un token JWT y retorna las claims si es válido.
+// @Summary Validate JWT token
+// @Description Validate a JWT token and return claims if valid. Used by other services.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer token"
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} map[string]string
+// @Router /api/v1/auth/validate-token [post]
+func ValidateToken(c *gin.Context) {
+	tokenStr := c.GetHeader("Authorization")
+	if tokenStr == "" || len(tokenStr) < 7 || tokenStr[:7] != "Bearer " {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization header"})
+		return
+	}
+	tokenStr = tokenStr[7:]
+
+	claims, err := auth.ValidateToken(tokenStr)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user_id": claims.UserID,
+		"email":   claims.Email,
+		"role":    claims.Role,
+	})
+}

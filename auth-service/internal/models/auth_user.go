@@ -2,12 +2,14 @@ package models
 
 import (
 	"time"
-
-	"gorm.io/gorm"
 )
 
+// @name User
 type User struct {
-	gorm.Model
+	ID        uint       `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `gorm:"index" json:"deleted_at,omitempty"`
 	// Make Email and PasswordHash nullable so OTP-only users can have NULL values
 	Email           *string   `gorm:"uniqueIndex;size:255" json:"email,omitempty"`
 	IDUser          string    `gorm:"size:100;uniqueIndex" json:"id_user"` // Identificador adicional de usuario

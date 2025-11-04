@@ -18,6 +18,46 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retrieve a list of all users in the system. Requires admin role.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "List all users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.User"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/login": {
             "post": {
                 "description": "Verify user credentials and return access and refresh tokens",
@@ -249,6 +289,48 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/api/v1/auth/validate-token": {
+            "post": {
+                "description": "Validate a JWT token and return claims if valid. Used by other services.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Validate JWT token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer token",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -271,7 +353,8 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "password"
+                "password",
+                "role"
             ],
             "properties": {
                 "birthday": {
@@ -290,6 +373,14 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "role": {
+                    "description": "only admin or operator allowed here",
+                    "type": "string",
+                    "enum": [
+                        "admin",
+                        "operator"
+                    ]
                 },
                 "telephone_number": {
                     "type": "string"
@@ -321,6 +412,50 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "models.User": {
+            "type": "object",
+            "properties": {
+                "birthday": {
+                    "description": "usa time.Time para fechas",
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "deleted_at": {
+                    "type": "string"
+                },
+                "dni": {
+                    "type": "string"
+                },
+                "email": {
+                    "description": "Make Email and PasswordHash nullable so OTP-only users can have NULL values",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "id_user": {
+                    "description": "Identificador adicional de usuario",
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "phone_verified": {
+                    "type": "boolean"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "telephone_number": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
         }
     }
 }`
@@ -335,6 +470,8 @@ var SwaggerInfo = &swag.Spec{
 	Description:      "Servicio de autenticación (registro, login) para la aplicación.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
+	LeftDelim:        "{{",
+	RightDelim:       "}}",
 }
 
 func init() {

@@ -11,3 +11,4 @@ func HealthHandler(c *gin.Context) {
 func HelloHandler(c *gin.Context) {
     c.JSON(200, gin.H{"message": "Hello, World!"})
 }
+
