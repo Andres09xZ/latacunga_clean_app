@@ -1,6 +1,6 @@
-basePath: /
+basePath: /api/v1
 definitions:
-  handlers.loginRequest:
+  handlers.LoginRequest:
     properties:
       email:
         type: string
@@ -10,41 +10,14 @@ definitions:
     - email
     - password
     type: object
-  handlers.registerRequest:
-    properties:
-      birthday:
-        description: RFC3339
-        type: string
-      dni:
-        type: string
-      email:
-        type: string
-      name:
-        type: string
-      password:
-        minLength: 6
-        type: string
-      role:
-        description: only admin or operator allowed here
-        enum:
-        - admin
-        - operator
-        type: string
-      telephone_number:
-        type: string
-    required:
-    - email
-    - password
-    - role
-    type: object
-  handlers.sendOTPRequest:
+  handlers.OTPRequest:
     properties:
       phone:
         type: string
     required:
     - phone
     type: object
-  handlers.verifyOTPRequest:
+  handlers.OTPVerifyRequest:
     properties:
       code:
         type: string
@@ -54,43 +27,47 @@ definitions:
     - code
     - phone
     type: object
+  handlers.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        enum:
+        - user
+        - operador
+        - admin
+        type: string
+    required:
+    - email
+    - password
+    - role
+    type: object
   models.User:
     properties:
-      birthday:
-        description: usa time.Time para fechas
-        type: string
       created_at:
         type: string
-      deleted_at:
-        type: string
-      dni:
+      display_name:
         type: string
       email:
-        description: Make Email and PasswordHash nullable so OTP-only users can have
-          NULL values
         type: string
       id:
-        type: integer
-      id_user:
-        description: Identificador adicional de usuario
         type: string
-      name:
+      phone:
         type: string
-      phone_verified:
-        type: boolean
       role:
         type: string
-      telephone_number:
+      status:
         type: string
       updated_at:
         type: string
     type: object
 host: localhost:8080
 info:
-  contact:
-    email: support@example.com
-    name: API Support
-  description: Servicio de autenticación (registro, login) para la aplicación.
+  contact: {}
+  description: Servicio de autenticación para registro y login de usuarios
   title: Auth Service API
   version: "1.0"
 paths:
@@ -119,18 +96,19 @@ paths:
       summary: List all users
       tags:
       - Users
-  /api/v1/auth/login:
+  /auth/login:
     post:
       consumes:
       - application/json
-      description: Verify user credentials and return access and refresh tokens
+      description: Authenticate user with email and password, return access and refresh
+        tokens
       parameters:
-      - description: Login payload
+      - description: Login request
         in: body
-        name: payload
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.loginRequest'
+          $ref: '#/definitions/handlers.LoginRequest'
       produces:
       - application/json
       responses:
@@ -147,32 +125,25 @@ paths:
             type: object
         "401":
           description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
           schema:
             additionalProperties:
               type: string
             type: object
       summary: Login user
       tags:
-      - Auth
-  /api/v1/auth/otp/send:
+      - auth
+  /auth/otp/send:
     post:
       consumes:
       - application/json
-      description: Send a numeric OTP to the provided phone number. Creates a user
-        if none exists. Intended for citizen users.
+      description: Request OTP code for phone authentication (citizens only)
       parameters:
-      - description: Phone payload
+      - description: OTP request
         in: body
-        name: payload
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.sendOTPRequest'
+          $ref: '#/definitions/handlers.OTPRequest'
       produces:
       - application/json
       responses:
@@ -188,27 +159,27 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "500":
-          description: Internal Server Error
+        "403":
+          description: Forbidden
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Send OTP to phone
+      summary: Request OTP
       tags:
-      - Auth
-  /api/v1/auth/otp/verify:
+      - otp
+  /auth/otp/verify:
     post:
       consumes:
       - application/json
-      description: Verify an OTP sent to phone and return JWT tokens for the user.
+      description: Verify OTP code and authenticate/create user
       parameters:
-      - description: Verify payload
+      - description: OTP verify request
         in: body
-        name: payload
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.verifyOTPRequest'
+          $ref: '#/definitions/handlers.OTPVerifyRequest'
       produces:
       - application/json
       responses:
@@ -223,34 +194,28 @@ paths:
             additionalProperties:
               type: string
             type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
+        "429":
+          description: Too Many Requests
           schema:
             additionalProperties:
               type: string
             type: object
       summary: Verify OTP
       tags:
-      - Auth
-  /api/v1/auth/register:
+      - otp
+  /auth/register:
     post:
       consumes:
       - application/json
-      description: Create a new user account. Returns the generated id_user and basic
-        profile.
+      description: Create a new user account with email, password and role (only operador/admin
+        allowed)
       parameters:
-      - description: Register payload
+      - description: Register request
         in: body
-        name: payload
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.registerRequest'
+          $ref: '#/definitions/handlers.RegisterRequest'
       produces:
       - application/json
       responses:
@@ -271,36 +236,7 @@ paths:
             additionalProperties:
               type: string
             type: object
-      summary: Register a new user
+      summary: Register a new user (operador/admin only)
       tags:
-      - Auth
-  /api/v1/auth/validate-token:
-    post:
-      consumes:
-      - application/json
-      description: Validate a JWT token and return claims if valid. Used by other
-        services.
-      parameters:
-      - description: Bearer token
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            additionalProperties: true
-            type: object
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Validate JWT token
-      tags:
-      - Auth
+      - auth
 swagger: "2.0"

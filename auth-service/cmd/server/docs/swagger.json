@@ -1,15 +1,12 @@
 {
     "swagger": "2.0",
     "info": {
-        "description": "Servicio de autenticación (registro, login) para la aplicación.",
+        "description": "Servicio de autenticación para registro y login de usuarios",
         "title": "Auth Service API",
-        "contact": {
-            "name": "API Support",
-            "email": "support@example.com"
-        },
+        "contact": {},
         "version": "1.0"
     },
     "host": "localhost:8080",
-    "basePath": "/",
+    "basePath": "/api/v1",
     "paths": {}
 }

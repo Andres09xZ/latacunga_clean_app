@@ -2,10 +2,9 @@ package middleware
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
-	"github.com/Andres09xZ/latacunga_clean_app/internal/auth"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/auth"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,26 +13,20 @@ const (
 	BearerPrefix        = "bearer"
 	ErrorMissingAuth    = "missing authorization header"
 	ErrorInvalidAuth    = "invalid authorization header"
-	ErrorInvalidaToken  = "invalid token"
-	ErrorInvalidClaims  = "invalid token claims"
-	ErrorMissingUserID  = "user_id missing in token"
+	ErrorInvalidToken   = "invalid token"
 )
 
 func JWTAuth() gin.HandlerFunc {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		panic("JWT_SECRET environment variable is not set")
-	}
-
 	return func(c *gin.Context) {
 		tokenStr, err := extractTokenFromHeader(c)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": ErrorMissingAuth})
 			return
 		}
+
 		claims, err := auth.ValidateToken(tokenStr)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": ErrorInvalidaToken})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": ErrorInvalidToken})
 			return
 		}
 
@@ -44,12 +37,12 @@ func JWTAuth() gin.HandlerFunc {
 }
 
 func extractTokenFromHeader(c *gin.Context) (string, error) {
-	auth := c.GetHeader(AuthorizationHeader)
-	if auth == "" {
+	authHeader := c.GetHeader(AuthorizationHeader)
+	if authHeader == "" {
 		return "", http.ErrNoLocation
 	}
 
-	parts := strings.Fields(auth)
+	parts := strings.Fields(authHeader)
 	if len(parts) != 2 || strings.ToLower(parts[0]) != BearerPrefix {
 		return "", http.ErrNoLocation
 	}

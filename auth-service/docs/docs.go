@@ -9,10 +9,7 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {
-            "name": "API Support",
-            "email": "support@example.com"
-        },
+        "contact": {},
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
@@ -58,9 +55,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/login": {
+        "/auth/login": {
             "post": {
-                "description": "Verify user credentials and return access and refresh tokens",
+                "description": "Authenticate user with email and password, return access and refresh tokens",
                 "consumes": [
                     "application/json"
                 ],
@@ -68,17 +65,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "auth"
                 ],
                 "summary": "Login user",
                 "parameters": [
                     {
-                        "description": "Login payload",
-                        "name": "payload",
+                        "description": "Login request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.loginRequest"
+                            "$ref": "#/definitions/handlers.LoginRequest"
                         }
                     }
                 ],
@@ -107,22 +104,13 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
                     }
                 }
             }
         },
-        "/api/v1/auth/otp/send": {
+        "/auth/otp/send": {
             "post": {
-                "description": "Send a numeric OTP to the provided phone number. Creates a user if none exists. Intended for citizen users.",
+                "description": "Request OTP code for phone authentication (citizens only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -130,17 +118,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "otp"
                 ],
-                "summary": "Send OTP to phone",
+                "summary": "Request OTP",
                 "parameters": [
                     {
-                        "description": "Phone payload",
-                        "name": "payload",
+                        "description": "OTP request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.sendOTPRequest"
+                            "$ref": "#/definitions/handlers.OTPRequest"
                         }
                     }
                 ],
@@ -163,8 +151,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -175,9 +163,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/otp/verify": {
+        "/auth/otp/verify": {
             "post": {
-                "description": "Verify an OTP sent to phone and return JWT tokens for the user.",
+                "description": "Verify OTP code and authenticate/create user",
                 "consumes": [
                     "application/json"
                 ],
@@ -185,17 +173,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "otp"
                 ],
                 "summary": "Verify OTP",
                 "parameters": [
                     {
-                        "description": "Verify payload",
-                        "name": "payload",
+                        "description": "OTP verify request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.verifyOTPRequest"
+                            "$ref": "#/definitions/handlers.OTPVerifyRequest"
                         }
                     }
                 ],
@@ -216,17 +204,8 @@ const docTemplate = `{
                             }
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -237,9 +216,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/auth/register": {
+        "/auth/register": {
             "post": {
-                "description": "Create a new user account. Returns the generated id_user and basic profile.",
+                "description": "Create a new user account with email, password and role (only operador/admin allowed)",
                 "consumes": [
                     "application/json"
                 ],
@@ -247,17 +226,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Auth"
+                    "auth"
                 ],
-                "summary": "Register a new user",
+                "summary": "Register a new user (operador/admin only)",
                 "parameters": [
                     {
-                        "description": "Register payload",
-                        "name": "payload",
+                        "description": "Register request",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.registerRequest"
+                            "$ref": "#/definitions/handlers.RegisterRequest"
                         }
                     }
                 ],
@@ -289,52 +268,10 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/api/v1/auth/validate-token": {
-            "post": {
-                "description": "Validate a JWT token and return claims if valid. Used by other services.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Validate JWT token",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Bearer token",
-                        "name": "Authorization",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
-        "handlers.loginRequest": {
+        "handlers.LoginRequest": {
             "type": "object",
             "required": [
                 "email",
@@ -349,45 +286,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.registerRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password",
-                "role"
-            ],
-            "properties": {
-                "birthday": {
-                    "description": "RFC3339",
-                    "type": "string"
-                },
-                "dni": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 6
-                },
-                "role": {
-                    "description": "only admin or operator allowed here",
-                    "type": "string",
-                    "enum": [
-                        "admin",
-                        "operator"
-                    ]
-                },
-                "telephone_number": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.sendOTPRequest": {
+        "handlers.OTPRequest": {
             "type": "object",
             "required": [
                 "phone"
@@ -398,7 +297,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.verifyOTPRequest": {
+        "handlers.OTPVerifyRequest": {
             "type": "object",
             "required": [
                 "code",
@@ -413,43 +312,53 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "role"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "operador",
+                        "admin"
+                    ]
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "properties": {
-                "birthday": {
-                    "description": "usa time.Time para fechas",
-                    "type": "string"
-                },
                 "created_at": {
                     "type": "string"
                 },
-                "deleted_at": {
-                    "type": "string"
-                },
-                "dni": {
+                "display_name": {
                     "type": "string"
                 },
                 "email": {
-                    "description": "Make Email and PasswordHash nullable so OTP-only users can have NULL values",
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
-                },
-                "id_user": {
-                    "description": "Identificador adicional de usuario",
                     "type": "string"
                 },
-                "name": {
+                "phone": {
                     "type": "string"
-                },
-                "phone_verified": {
-                    "type": "boolean"
                 },
                 "role": {
                     "type": "string"
                 },
-                "telephone_number": {
+                "status": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -464,10 +373,10 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8080",
-	BasePath:         "/",
+	BasePath:         "/api/v1",
 	Schemes:          []string{},
 	Title:            "Auth Service API",
-	Description:      "Servicio de autenticación (registro, login) para la aplicación.",
+	Description:      "Servicio de autenticación para registro y login de usuarios",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

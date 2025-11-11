@@ -1,374 +1,318 @@
-package handlers
+﻿package handlers
 
 import (
 	"crypto/rand"
 	"fmt"
-	"log"
-	"math/big"
 	"net/http"
-
-	// strings no es necesario actualmente
+	"regexp"
 	"time"
 
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/auth"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/Andres09xZ/latacunga_clean_app/internal/auth"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/database"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/models"
-	"gorm.io/gorm"
 )
 
-type registerRequest struct {
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=6"`
-	Name            string `json:"name"`
-	Dni             string `json:"dni"`
-	TelephoneNumber string `json:"telephone_number"`
-	Birthday        string `json:"birthday"`                                     // RFC3339
-	Role            string `json:"role" binding:"required,oneof=admin operator"` // only admin or operator allowed here
+type RegisterRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	Role     string `json:"role" binding:"required,oneof=user operador admin"`
 }
 
-// Register crea un nuevo usuario (genera IDUser) y retorna datos básicos.
-// @Summary Register a new user
-// @Description Create a new user account. Returns the generated id_user and basic profile.
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param payload body registerRequest true "Register payload"
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/v1/auth/register [post]
-func Register(c *gin.Context) {
-	var req registerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	// El role debe venir en el payload y ser 'admin' o 'operator'
-	if req.Role != "admin" && req.Role != "operator" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "role must be 'admin' or 'operator'"})
-		return
-	}
-	var bday time.Time
-	if req.Birthday != "" {
-		// Accept RFC3339 (e.g. 2006-01-02T15:04:05Z07:00) or common short date YYYY-MM-DD
-		t, err := time.Parse(time.RFC3339, req.Birthday)
-		if err != nil {
-			// try short date
-			t2, err2 := time.Parse("2006-01-02", req.Birthday)
-			if err2 != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid birthday format, use RFC3339 or YYYY-MM-DD"})
-				return
-			}
-			bday = t2
-		} else {
-			bday = t
-		}
-	}
-
-	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
-		return
-	}
-
-	// Prepare pointers for nullable fields
-	emailPtr := req.Email
-	passPtr := string(hashed)
-
-	user := models.User{
-		Email:           &emailPtr,
-		IDUser:          uuid.NewString(),
-		PasswordHash:    &passPtr,
-		Name:            req.Name,
-		Role:            req.Role,
-		Dni:             req.Dni,
-		TelephoneNumber: req.TelephoneNumber,
-		Birthday:        bday,
-	}
-
-	if err := database.DB.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// emailPtr holds the original string used for the Email pointer
-	c.JSON(http.StatusCreated, gin.H{
-		"id_user": user.IDUser,
-		"email":   emailPtr,
-		"name":    user.Name,
-		"role":    user.Role,
-	})
-}
-
-type loginRequest struct {
+type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
 }
 
-// Login verifica credenciales y emite access/refresh tokens.
-// @Summary Login user
-// @Description Verify user credentials and return access and refresh tokens
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param payload body loginRequest true "Login payload"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 401 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/v1/auth/login [post]
-func Login(c *gin.Context) {
-	var req loginRequest
+type OTPRequest struct {
+	Phone string `json:"phone" binding:"required"`
+}
+
+type OTPVerifyRequest struct {
+	Phone string `json:"phone" binding:"required"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+// Register creates a new user account (only for operador/admin)
+//
+//	@Summary	Register a new user (operador/admin only)
+//	@Description	Create a new user account with email, password and role (only operador/admin allowed)
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		request	body		RegisterRequest	true	"Register request"
+//	@Success	201		{object}	map[string]interface{}
+//	@Failure	400		{object}	map[string]string
+//	@Failure	500		{object}	map[string]string
+//	@Router		/auth/register [post]
+//
+// @Tagsauth
+// @Acceptjson
+// @Producejson
+// @ParamrequestbodyRegisterRequesttrue"Register request""
+// @Success201{object}map[string]interface{}
+// @Failure400{object}map[string]string
+// @Failure500{object}map[string]string
+// @Router/auth/register [post]
+func Register(c *gin.Context) {
+	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Reject registration for "user" role - must use OTP
+	if req.Role == "user" {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Registro de ciudadanos solo por OTP (teléfono)"})
+		return
+	}
+
+	// Check if user already exists
+	var existing models.User
+	if err := database.DB.Where("email = ?", req.Email).First(&existing).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User already exists"})
+		return
+	}
+
+	// Hash password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), 12)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Create user
+	user := models.User{
+		Email:        &req.Email,
+		PasswordHash: stringPtr(string(hashed)),
+		Role:         req.Role,
+		DisplayName:  req.Email, // Use email as display name for now
+	}
+
+	if err := database.DB.Create(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// If role is operador, create operator profile
+	if req.Role == "operador" {
+		operatorProfile := models.OperatorProfile{
+			UserID: user.ID,
+		}
+		if err := database.DB.Create(&operatorProfile).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create operator profile"})
+			return
+		}
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"id":    user.ID,
+		"email": *user.Email,
+		"role":  user.Role,
+	})
+}
+
+// Login authenticates a user and returns tokens
+//
+// @Summary Login user
+// @Description Authenticate user with email and password, return access and refresh tokens
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body LoginRequest true "Login request"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /auth/login [post]
+func Login(c *gin.Context) {
+	var req LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Find user
 	var user models.User
 	if err := database.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	// Ensure password hash exists for this user
-	if user.PasswordHash == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+	// Check password
+	if user.PasswordHash == nil || bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)) != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(*user.PasswordHash), []byte(req.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
-		return
-	}
-
-	// Only admin and operator roles can use this email/password login route
-	if user.Role != "admin" && user.Role != "operator" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "email/password login is restricted to admin or operator roles"})
-		return
-	}
-
-	// prepare email string for tokens (nullable)
-	emailStr := ""
-	if user.Email != nil {
-		emailStr = *user.Email
-	}
-
-	access, refresh, err := auth.GenerateTokens(user.IDUser, emailStr, user.Role)
+	// Generate tokens
+	accessToken, refreshToken, err := auth.GenerateTokens(user.ID.String(), *user.Email, user.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"access_token":  access,
-		"refresh_token": refresh,
-		"user": gin.H{
-			"id_user": user.IDUser,
-			"email":   emailStr,
-			"name":    user.Name,
-			"role":    user.Role,
-		},
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
 }
 
-// sendOTPRequest for sending an OTP to a phone number
-type sendOTPRequest struct {
-	Phone string `json:"phone" binding:"required"`
-}
-
-// SendOTP generates an OTP for the provided phone number and (for now) logs it.
-// If the phone is not associated to a user, a new user with role "user" is created.
-// @Summary Send OTP to phone
-// @Description Send a numeric OTP to the provided phone number. Creates a user if none exists. Intended for citizen users.
-// @Tags Auth
+// RequestOTP sends OTP to phone number
+//
+// @Summary Request OTP
+// @Description Request OTP code for phone authentication (citizens only)
+// @Tags otp
 // @Accept json
 // @Produce json
-// @Param payload body sendOTPRequest true "Phone payload"
+// @Param request body OTPRequest true "OTP request"
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/v1/auth/otp/send [post]
-func SendOTP(c *gin.Context) {
-	var req sendOTPRequest
+// @Failure 403 {object} map[string]string
+// @Router /auth/otp/send [post]
+func RequestOTP(c *gin.Context) {
+	var req OTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Basic normalization could be added; for now use exactly what's provided
-	var user models.User
-	err := database.DB.Where("telephone_number = ?", req.Phone).First(&user).Error
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// create a minimal user record for this phone with role 'user'
-			user = models.User{
-				IDUser: uuid.NewString(),
-				// Email and PasswordHash intentionally left nil so DB stores NULL
-				Name:            "",
-				Role:            "user",
-				TelephoneNumber: req.Phone,
-			}
-			if err := database.DB.Create(&user).Error; err != nil {
-				log.Printf("db create user error: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-				return
-			}
-
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-	} else {
-		// If user exists, only allow OTP flow for role 'user'
-		if user.Role != "user" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "otp flow is only allowed for users with role 'user'"})
-			return
-		}
-	}
-
-	// generate 6-digit OTP
-	code := generateOTPCode()
-	expires := time.Now().Add(5 * time.Minute)
-
-	user.OTPCode = code
-	user.OTPExpiresAt = &expires
-	if err := database.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save otp"})
+	// Validate phone format (E.164)
+	if !isValidPhone(req.Phone) {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "Formato de teléfono inválido. Use E.164"})
 		return
 	}
 
-	// TODO: integrate SMS provider (Twilio, AWS SNS). For now, output code in logs for dev.
-	log.Printf("OTP for %s = %s (expires %s)", req.Phone, code, expires.Format(time.RFC3339))
+	// Check if phone belongs to non-user role
+	var user models.User
+	if err := database.DB.Where("phone = ?", req.Phone).First(&user).Error; err == nil {
+		if user.Role != "user" {
+			c.JSON(http.StatusForbidden, gin.H{"message": "Método de autenticación no permitido para este rol"})
+			return
+		}
+	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "otp_sent"})
+	// Generate 6-digit OTP
+	otpCode := generateOTP()
+
+	// Hash the code
+	hashedCode, err := bcrypt.GenerateFromPassword([]byte(otpCode), 12)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate OTP"})
+		return
+	}
+
+	// Save OTP code
+	otp := models.OTPCode{
+		Phone:       req.Phone,
+		CodeHash:    string(hashedCode),
+		ExpiresAt:   time.Now().Add(5 * time.Minute),
+		MaxAttempts: 5,
+	}
+
+	if err := database.DB.Create(&otp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save OTP"})
+		return
+	}
+
+	// TODO: Send OTP via SMS (placeholder)
+	fmt.Printf("OTP for %s: %s\n", req.Phone, otpCode)
+
+	c.JSON(http.StatusOK, gin.H{"message": "OTP enviado"})
 }
 
-// verifyOTPRequest verifies the OTP code for a phone number
-type verifyOTPRequest struct {
-	Phone string `json:"phone" binding:"required"`
-	Code  string `json:"code" binding:"required"`
-}
-
-// VerifyOTP checks the code and returns tokens for the user (role user).
+// VerifyOTP verifies OTP code and creates/logs in user
+//
 // @Summary Verify OTP
-// @Description Verify an OTP sent to phone and return JWT tokens for the user.
-// @Tags Auth
+// @Description Verify OTP code and authenticate/create user
+// @Tags otp
 // @Accept json
 // @Produce json
-// @Param payload body verifyOTPRequest true "Verify payload"
+// @Param request body OTPVerifyRequest true "OTP verify request"
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
-// @Failure 401 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/v1/auth/otp/verify [post]
+// @Failure 429 {object} map[string]string
+// @Router /auth/otp/verify [post]
 func VerifyOTP(c *gin.Context) {
-	var req verifyOTPRequest
+	var req OTPVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
+	// Find latest OTP for phone
+	var otp models.OTPCode
+	if err := database.DB.Where("phone = ? AND consumed = false AND expires_at > ?", req.Phone, time.Now()).
+		Order("issued_at DESC").First(&otp).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "OTP inválido"})
+		return
+	}
+
+	// Check attempts
+	if otp.Attempts >= otp.MaxAttempts {
+		c.JSON(http.StatusTooManyRequests, gin.H{"message": "Límite de intentos excedido, solicite un nuevo OTP"})
+		return
+	}
+
+	// Increment attempts
+	otp.Attempts++
+	database.DB.Save(&otp)
+
+	// Verify code
+	if bcrypt.CompareHashAndPassword([]byte(otp.CodeHash), []byte(req.Code)) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "OTP inválido"})
+		return
+	}
+
+	// Mark as consumed
+	otp.Consumed = true
+	database.DB.Save(&otp)
+
+	// Find or create user
 	var user models.User
-	if err := database.DB.Where("telephone_number = ?", req.Phone).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid phone or code"})
-		return
-	}
-
-	if user.OTPCode == "" || user.OTPExpiresAt == nil || time.Now().After(*user.OTPExpiresAt) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "otp expired or not found"})
-		return
-	}
-
-	if req.Code != user.OTPCode {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid code"})
-		return
-	}
-
-	// mark phone verified and clear OTP
-	user.PhoneVerified = true
-	user.OTPCode = ""
-	user.OTPExpiresAt = nil
-	if err := database.DB.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
-		return
-	}
-
-	// prepare email string for tokens (nullable)
-	emailStr := ""
-	if user.Email != nil {
-		emailStr = *user.Email
-	}
-
-	// Issue tokens (role should already be "user")
-	access, refresh, err := auth.GenerateTokens(user.IDUser, emailStr, user.Role)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate tokens"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"access_token":  access,
-		"refresh_token": refresh,
-		"user": gin.H{
-			"id_user":        user.IDUser,
-			"email":          emailStr,
-			"name":           user.Name,
-			"role":           user.Role,
-			"phone_verified": user.PhoneVerified,
-		},
-	})
-}
-
-// generateOTPCode returns a secure random 6-digit numeric code as string.
-func generateOTPCode() string {
-	var code string
-	for i := 0; i < 6; i++ {
-		n, err := rand.Int(rand.Reader, big.NewInt(10))
-		if err != nil {
-			// fallback to pseudo-random digit
-			return fmt.Sprintf("%06d", time.Now().UnixNano()%1000000)
+	if err := database.DB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
+		// Create new user
+		user = models.User{
+			Phone:       &req.Phone,
+			Role:        "user",
+			DisplayName: req.Phone, // Use phone as display name
 		}
-		code += fmt.Sprintf("%d", n.Int64())
+		if err := database.DB.Create(&user).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+			return
+		}
 	}
-	return code
-}
 
-// ValidateToken valida un token JWT y retorna las claims si es válido.
-// @Summary Validate JWT token
-// @Description Validate a JWT token and return claims if valid. Used by other services.
-// @Tags Auth
-// @Accept json
-// @Produce json
-// @Param Authorization header string true "Bearer token"
-// @Success 200 {object} map[string]interface{}
-// @Failure 401 {object} map[string]string
-// @Router /api/v1/auth/validate-token [post]
-func ValidateToken(c *gin.Context) {
-	tokenStr := c.GetHeader("Authorization")
-	if tokenStr == "" || len(tokenStr) < 7 || tokenStr[:7] != "Bearer " {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing or invalid authorization header"})
-		return
-	}
-	tokenStr = tokenStr[7:]
-
-	claims, err := auth.ValidateToken(tokenStr)
+	// Generate tokens
+	accessToken, refreshToken, err := auth.GenerateTokens(user.ID.String(), *user.Phone, user.Role)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_id": claims.UserID,
-		"email":   claims.Email,
-		"role":    claims.Role,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
 	})
+}
+
+// Helper functions
+func stringPtr(s string) *string {
+	return &s
+}
+
+func isValidPhone(phone string) bool {
+	// E.164 format: +[country code][number]
+	match, _ := regexp.MatchString(`^\+[1-9]\d{7,14}$`, phone)
+	return match
+}
+
+func generateOTP() string {
+	const digits = "0123456789"
+	code := make([]byte, 6)
+	rand.Read(code)
+	for i := range code {
+		code[i] = digits[int(code[i])%10]
+	}
+	return string(code)
 }

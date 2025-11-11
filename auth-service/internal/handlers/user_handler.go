@@ -1,11 +1,11 @@
 package handlers
 
 import (
-    "net/http"
+	"net/http"
 
-    "github.com/Andres09xZ/latacunga_clean_app/internal/database"
-    "github.com/Andres09xZ/latacunga_clean_app/internal/models"
-    "github.com/gin-gonic/gin"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
+	"github.com/gin-gonic/gin"
 )
 
 // ListUsers obtiene una lista de todos los usuarios.
@@ -19,10 +19,10 @@ import (
 // @Failure 500 {object} map[string]string
 // @Router /api/v1/admin/users [get]
 func ListUsers(c *gin.Context) {
-    var users []models.User
-    if err := database.DB.Find(&users).Error; err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-        return
-    }
-    c.JSON(http.StatusOK, users)
+	var users []models.User
+	if err := database.DB.Find(&users).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+		return
+	}
+	c.JSON(http.StatusOK, users)
 }

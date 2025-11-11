@@ -87,3 +87,8 @@ func ValidateToken(tokenStr string) (*Claims, error) {
 	}
 	return nil, jwt.ErrTokenInvalidClaims
 }
+
+// ValidateRefreshToken valida un refresh token
+func ValidateRefreshToken(tokenStr string) (*Claims, error) {
+	return ValidateToken(tokenStr) // Same validation for now
+}

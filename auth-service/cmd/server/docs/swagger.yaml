@@ -1,10 +1,8 @@
-basePath: /
+basePath: /api/v1
 host: localhost:8080
 info:
-  contact:
-    email: support@example.com
-    name: API Support
-  description: Servicio de autenticación (registro, login) para la aplicación.
+  contact: {}
+  description: Servicio de autenticación para registro y login de usuarios
   title: Auth Service API
   version: "1.0"
 paths: {}
