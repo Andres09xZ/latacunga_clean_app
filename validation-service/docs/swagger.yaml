@@ -1,0 +1,179 @@
+basePath: /
+definitions:
+  handlers.MarkValidRequest:
+    properties:
+      idempotency_key:
+        type: string
+    required:
+    - idempotency_key
+    type: object
+  handlers.RejectRequest:
+    properties:
+      idempotency_key:
+        type: string
+      reason:
+        type: string
+    required:
+    - idempotency_key
+    - reason
+    type: object
+  models.ValidationResponse:
+    properties:
+      decided_at:
+        type: string
+      id:
+        type: string
+      idempotency_key:
+        type: string
+      incident_id:
+        type: string
+      reason:
+        type: string
+      requested_at:
+        type: string
+      status:
+        type: string
+      validator_kind:
+        type: string
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: Validation service for incident management with manual and automatic
+    validation
+  title: Validation Service API
+  version: "1.0"
+paths:
+  /api/v1/validations/{incident_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get all validations for a specific incident
+      parameters:
+      - description: Incident ID
+        in: path
+        name: incident_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ValidationResponse'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Get validation history
+      tags:
+      - validations
+  /api/v1/validations/{incident_id}/mark-valid:
+    post:
+      consumes:
+      - application/json
+      description: Manually validate an incident and change its status to "valida"
+      parameters:
+      - description: Incident ID
+        in: path
+        name: incident_id
+        required: true
+        type: string
+      - description: Validation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MarkValidRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ValidationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Mark incident as valid
+      tags:
+      - validations
+  /api/v1/validations/{incident_id}/reject:
+    post:
+      consumes:
+      - application/json
+      description: Manually reject an incident and change its status to "rechazada"
+      parameters:
+      - description: Incident ID
+        in: path
+        name: incident_id
+        required: true
+        type: string
+      - description: Rejection request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RejectRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ValidationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - Bearer: []
+      summary: Reject incident
+      tags:
+      - validations
+schemes:
+- http
+securityDefinitions:
+  Bearer:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

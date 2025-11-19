@@ -1,0 +1,280 @@
+{
+  "schemes": ["http"],
+  "swagger": "2.0",
+  "info": {
+    "description": "Schedule Service API for managing shifts and task scheduling",
+    "title": "Schedule Service API",
+    "contact": {},
+    "version": "1.0"
+  },
+  "host": "localhost:8083",
+  "basePath": "/",
+  "paths": {
+    "/health": {
+      "get": {
+        "description": "Health check endpoint",
+        "produces": ["application/json"],
+        "tags": ["health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/shifts": {
+      "get": {
+        "description": "Get all shifts, optionally filtered by date",
+        "produces": ["application/json"],
+        "tags": ["shifts"],
+        "summary": "List all shifts",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Filter by date (YYYY-MM-DD)",
+            "name": "date",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Create a new shift in the schedule",
+        "produces": ["application/json"],
+        "tags": ["shifts"],
+        "summary": "Create a new shift",
+        "parameters": [
+          {
+            "description": "Shift details",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/shifts/{id}": {
+      "get": {
+        "description": "Get details of a specific shift",
+        "produces": ["application/json"],
+        "tags": ["shifts"],
+        "summary": "Get a shift by ID",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Shift ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "description": "Update shift details",
+        "produces": ["application/json"],
+        "tags": ["shifts"],
+        "summary": "Update a shift",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Shift ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "description": "Updated shift details",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Delete a shift by ID",
+        "produces": ["application/json"],
+        "tags": ["shifts"],
+        "summary": "Delete a shift",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Shift ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedule/{date}": {
+      "get": {
+        "description": "Get all tasks scheduled for a specific date",
+        "produces": ["application/json"],
+        "tags": ["schedule"],
+        "summary": "Get daily schedule",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Date (YYYY-MM-DD)",
+            "name": "date",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}/assign": {
+      "post": {
+        "description": "Manually assign a task to a specific shift",
+        "produces": ["application/json"],
+        "tags": ["schedule"],
+        "summary": "Assign task to shift",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Task ID",
+            "name": "id",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "Shift ID",
+            "name": "shift_id",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

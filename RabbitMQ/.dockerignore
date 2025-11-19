@@ -1,0 +1,10 @@
+# Ignore local files that shouldn't be sent to the Docker build context
+.git
+**/.git
+node_modules
+**/node_modules
+.env
+*.zip
+*.ez
+definitions.json
+# enabled_plugins is needed in the image build, so do NOT ignore it.

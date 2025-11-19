@@ -1,0 +1,16 @@
+# Ignore RabbitMQ definitions containing users/vhosts/queues
+# These may include credentials or internal topology.
+# If you need to version a template, create `definitions.example.json` instead.
+
+definitions.json
+rabbitmq-definitions.json
+# Generic pattern (any file ending with definitions.json)
+*definitions.json
+
+# If you later move them to a higher-level folder, keep the patterns.
+
+# Environment files with credentials
+.env
+
+# Node/Editor local configs (optional)
+.vscode/

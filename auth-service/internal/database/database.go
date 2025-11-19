@@ -26,14 +26,30 @@ func InitDB() {
 
 	log.Println("Conectado a Neon PostgreSQL")
 
-	// Drop tables in reverse order to avoid foreign key constraints
-	err = DB.Migrator().DropTable(&models.OTPCode{}, &models.OperatorProfile{}, &models.User{})
-	if err != nil {
-		log.Printf("Warning: Could not drop tables: %v", err)
+	// Enable required extensions
+	if err = DB.Exec("CREATE EXTENSION IF NOT EXISTS citext").Error; err != nil {
+		log.Fatal("Failed to create citext extension:", err)
 	}
 
-	// Auto-migrate models
-	err = DB.AutoMigrate(&models.User{}, &models.OperatorProfile{}, &models.OTPCode{})
+	// Create schema if not exists
+	if err = DB.Exec("CREATE SCHEMA IF NOT EXISTS usuario").Error; err != nil {
+		log.Fatal("Failed to create usuario schema:", err)
+	}
+
+	// Drop old tables if they exist
+	if err = DB.Migrator().DropTable(&models.User{}); err != nil {
+		log.Printf("Warning: Could not drop users table: %v", err)
+	}
+
+	// Auto-migrate new models
+	err = DB.AutoMigrate(
+		&models.Operator{},
+		&models.Citizen{},
+		&models.OTPRequest{},
+		&models.IdempotencyKey{},
+		&models.OutboxEvent{},
+		&models.RefreshToken{},
+	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}

@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: rabbitmq
+    runtime: docker
+    
+    # Use the updated image from Docker Hub
+    image:
+      url: mrengineer09/rabbitmq:plugins
+    
+    # Port configuration
+    port: 5672
+    
+    # Health check configuration for Render
+    healthCheck:
+      path: /api/alarms
+      protocol: http
+      port: 15672
+      timeout: 10
+      startPeriod: 60
+      interval: 30
+    
+    # Environment variables from .env
+    envVars:
+      - key: RABBITMQ_DEFAULT_USER
+        value: tesis
+      - key: RABBITMQ_DEFAULT_PASS
+        value: tesis
+        isPrivate: true
+    
+    # Persistent volume for RabbitMQ data
+    disk:
+      name: rabbitmq-data
+      mountPath: /var/lib/rabbitmq
+      sizeGB: 1
+    
+    # Resource limits
+    plan: standard
+    
+    # Expose ports
+    staticPublicRepo: false
+    autoDeploy: false
+    # Set branch as needed:
+    # branch: main
+
+# Alternative: Use docker-compose.yml directly
+# Just connect your Git repo and Render will use docker-compose.yml

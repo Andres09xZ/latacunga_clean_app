@@ -15,13 +15,3 @@ type RefreshToken struct {
 
 	User User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
-
-// OTPRequest represents an OTP request for phone verification
-type OTPRequest struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	Phone     string    `gorm:"size:20;not null" json:"phone"`
-	Code      string    `gorm:"size:10;not null" json:"code"`
-	ExpiresAt time.Time `gorm:"not null" json:"expires_at"`
-	Attempts  int       `gorm:"default:0" json:"attempts"`
-	CreatedAt time.Time `json:"created_at"`
-}
