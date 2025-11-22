@@ -36,24 +36,37 @@ func (s *Server) Setup(jwtSecret string) error {
 
 	// Initialize handlers
 	scheduleHandler := handlers.NewScheduleHandler(s.db)
+	zoneHandler := handlers.NewZoneHandler(s.db)
 
 	// Protected routes group
-	protected := s.Router.Group("")
-	protected.Use(middleware.JWTAuth(jwtSecret))
+	protected := s.Router.Group("/api/v1")
+	protected.Use(middleware.JWTAuth())
+
+	// Schedule endpoints
+	protected.GET("/schedule/:date", scheduleHandler.GetDailySchedule)
+	protected.POST("/tasks/:id/assign", scheduleHandler.AssignTaskToShift)
 
 	// Shift endpoints
-	protected.POST("/api/v1/shifts", scheduleHandler.CreateShift)
-	protected.GET("/api/v1/shifts", scheduleHandler.ListShifts)
-	protected.GET("/api/v1/shifts/:id", scheduleHandler.GetShift)
-	protected.PUT("/api/v1/shifts/:id", scheduleHandler.UpdateShift)
-	protected.DELETE("/api/v1/shifts/:id", scheduleHandler.DeleteShift)
-
-	// Schedule endpoints (require operator role)
-	protected.Use(middleware.RequireOperatorRole())
-	protected.GET("/api/v1/schedule/:date", scheduleHandler.GetDailySchedule)
-	protected.POST("/api/v1/tasks/:id/assign", scheduleHandler.AssignTaskToShift)
+	protected.GET("/shifts", scheduleHandler.ListShifts)
+	protected.POST("/shifts", scheduleHandler.CreateShift)
+	protected.GET("/shifts/:id", scheduleHandler.GetShift)
+	protected.PUT("/shifts/:id", scheduleHandler.UpdateShift)
+	protected.DELETE("/shifts/:id", scheduleHandler.DeleteShift)
 
 	log.Println("✅ Routes configured")
+
+	// Public zone endpoints (documented separately, no auth required for read operations)
+	s.Router.GET("/api/zones", zoneHandler.GetAllZones)
+	s.Router.GET("/api/zones/:id", zoneHandler.GetZoneByID)
+	s.Router.GET("/api/zones/route/:route_name", zoneHandler.GetZonesByRoute)
+	s.Router.GET("/api/zones/day/:day", zoneHandler.GetZonesByDay)
+	s.Router.GET("/api/zones/search", zoneHandler.SearchZoneByPoint)
+	s.Router.GET("/api/zones/nearest", zoneHandler.GetNearestZone)
+	s.Router.GET("/api/zones/summary/routes", zoneHandler.GetZonesSummaryByRoute)
+	s.Router.GET("/api/zones/summary/days", zoneHandler.GetZonesSummaryByDay)
+	s.Router.GET("/api/zones/geojson", zoneHandler.GetZonesGeoJSON)
+
+	log.Println("🗺️ Zone routes configured")
 	return nil
 }
 

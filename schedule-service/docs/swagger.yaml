@@ -1,0 +1,616 @@
+definitions:
+  models.CleaningZone:
+    properties:
+      area_km2:
+        type: number
+      created_at:
+        type: string
+      geojson:
+        description: Campo virtual para respuestas API
+        type: string
+      id:
+        type: integer
+      points_count:
+        type: integer
+      route_name:
+        type: string
+      schedule_day:
+        description: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
+        type: integer
+      updated_at:
+        type: string
+      zone_name:
+        type: string
+    type: object
+  models.CreateShiftRequest:
+    properties:
+      date:
+        type: string
+      end_time:
+        type: string
+      max_tasks:
+        minimum: 1
+        type: integer
+      start_time:
+        type: string
+    required:
+    - date
+    - end_time
+    - max_tasks
+    - start_time
+    type: object
+  models.DailyScheduleResponse:
+    properties:
+      date:
+        type: string
+      shifts:
+        items:
+          $ref: '#/definitions/models.ShiftResponse'
+        type: array
+      tasks:
+        items:
+          $ref: '#/definitions/models.ScheduleTaskResponse'
+        type: array
+    type: object
+  models.ScheduleTaskResponse:
+    properties:
+      created_at:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      latitude:
+        type: number
+      location:
+        type: string
+      longitude:
+        type: number
+      priority:
+        type: string
+      shift_id:
+        type: string
+      status:
+        type: string
+      task_id:
+        type: string
+      task_type:
+        type: string
+    type: object
+  models.ShiftResponse:
+    properties:
+      created_at:
+        type: string
+      date:
+        type: string
+      end_time:
+        type: string
+      id:
+        type: string
+      max_tasks:
+        type: integer
+      start_time:
+        type: string
+      status:
+        type: string
+      task_count:
+        type: integer
+    type: object
+  models.ZoneSearchResult:
+    properties:
+      day_name:
+        type: string
+      distance_meters:
+        type: number
+      route_name:
+        type: string
+      zone_id:
+        type: integer
+      zone_name:
+        type: string
+    type: object
+  models.ZonesByDay:
+    properties:
+      day_name:
+        type: string
+      routes:
+        type: string
+      schedule_day:
+        type: integer
+      total_area_km2:
+        type: number
+      total_zones:
+        type: integer
+    type: object
+  models.ZonesByRoute:
+    properties:
+      avg_points_per_zone:
+        type: number
+      route_name:
+        type: string
+      total_area_km2:
+        type: number
+      total_zones:
+        type: integer
+      zones:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /api/v1/schedule/{date}:
+    get:
+      consumes:
+      - application/json
+      description: Get all tasks scheduled for a specific date
+      parameters:
+      - description: Date (YYYY-MM-DD)
+        in: path
+        name: date
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.DailyScheduleResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get daily schedule
+      tags:
+      - schedule
+  /api/v1/shifts:
+    get:
+      consumes:
+      - application/json
+      description: Get all shifts, optionally filtered by date
+      parameters:
+      - description: Filter by date (YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ShiftResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: List all shifts
+      tags:
+      - shifts
+    post:
+      consumes:
+      - application/json
+      description: Create a new shift in the schedule
+      parameters:
+      - description: Shift details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ShiftResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Create a new shift
+      tags:
+      - shifts
+  /api/v1/shifts/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a shift by ID
+      parameters:
+      - description: Shift ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Delete a shift
+      tags:
+      - shifts
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific shift
+      parameters:
+      - description: Shift ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ShiftResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get a shift by ID
+      tags:
+      - shifts
+    put:
+      consumes:
+      - application/json
+      description: Update shift details
+      parameters:
+      - description: Shift ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated shift details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CreateShiftRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ShiftResponse'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update a shift
+      tags:
+      - shifts
+  /api/v1/tasks/{id}/assign:
+    post:
+      consumes:
+      - application/json
+      description: Manually assign a task to a specific shift
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Shift ID
+        in: query
+        name: shift_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ScheduleTaskResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Assign task to shift
+      tags:
+      - schedule
+  /api/zones:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas las zonas geográficas de recolección
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.CleaningZone'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Lista todas las zonas de recolección
+      tags:
+      - zones
+  /api/zones/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna los detalles de una zona específica
+      parameters:
+      - description: Zone ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CleaningZone'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Obtiene una zona por ID
+      tags:
+      - zones
+  /api/zones/day/{day}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas las zonas de un día específico (0=Dom, 1=Lun, ...,
+        6=Sáb)
+      parameters:
+      - description: Day of Week
+        example: 1
+        in: path
+        name: day
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.CleaningZone'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Lista zonas por día
+      tags:
+      - zones
+  /api/zones/geojson:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas las zonas en formato GeoJSON FeatureCollection
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Exporta zonas como GeoJSON
+      tags:
+      - zones
+  /api/zones/nearest:
+    get:
+      consumes:
+      - application/json
+      description: Encuentra la zona más cercana a un punto geográfico (aunque no
+        lo contenga)
+      parameters:
+      - description: Latitude
+        example: -0.933
+        in: query
+        name: lat
+        required: true
+        type: number
+      - description: Longitude
+        example: -78.614
+        in: query
+        name: lon
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ZoneSearchResult'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Busca zona más cercana
+      tags:
+      - zones
+  /api/zones/route/{route_name}:
+    get:
+      consumes:
+      - application/json
+      description: Retorna todas las zonas de una ruta específica
+      parameters:
+      - description: Route Name
+        example: RUTA_1
+        in: path
+        name: route_name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.CleaningZone'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Lista zonas por ruta
+      tags:
+      - zones
+  /api/zones/search:
+    get:
+      consumes:
+      - application/json
+      description: Encuentra la zona que contiene un punto geográfico específico
+      parameters:
+      - description: Latitude
+        example: -0.933
+        in: query
+        name: lat
+        required: true
+        type: number
+      - description: Longitude
+        example: -78.614
+        in: query
+        name: lon
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ZoneSearchResult'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Busca zona por coordenadas
+      tags:
+      - zones
+  /api/zones/summary/days:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estadísticas agrupadas por día de la semana
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ZonesByDay'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Resumen de zonas por día
+      tags:
+      - zones
+  /api/zones/summary/routes:
+    get:
+      consumes:
+      - application/json
+      description: Retorna estadísticas agrupadas por ruta
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.ZonesByRoute'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Resumen de zonas por ruta
+      tags:
+      - zones
+swagger: "2.0"
