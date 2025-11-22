@@ -11,13 +11,18 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-var (
-	rabbitConn *amqp.Connection
-	rabbitCh   *amqp.Channel
-	mu         sync.Mutex
+const (
+	ExchangeName = "city.cleaning.incidents" 
+	ExchangeType = "topic"
 )
 
-// InitRabbitMQ inicializa la conexión a RabbitMQ
+var (
+	RabbitConn *amqp.Connection
+	rabbitCh   *amqp.Channel
+	mu 	   		sync.Mutex
+)
+
+// InitRabbitMQ incializa la conexion y asegura que el Exchange exista 
 func InitRabbitMQ() error {
 	rabbitURL := os.Getenv("RABBITMQ_URL")
 	if rabbitURL == "" {
@@ -26,90 +31,85 @@ func InitRabbitMQ() error {
 	}
 
 	var err error
-	rabbitConn, err = amqp.Dial(rabbitURL)
+	RabbitConn, err = amqp.Dial(rabbitURL)
 	if err != nil {
-		log.Printf("Warning: Failed to connect to RabbitMQ: %v", err)
-		return err
+		return fmt.Errorf("Failed to connect to RabbitMQ: %v", err)
 	}
 
-	rabbitCh, err = rabbitConn.Channel()
+	rabbitCh, err = RabbitConn.Channel()
 	if err != nil {
-		log.Printf("Warning: Failed to open RabbitMQ channel: %v", err)
-		return err
+		return fmt.Errorf("Failed to open a channel: %v", err)
 	}
 
-	// Declarar exchange "incidentes"
+	// Declarar el Exchange
 	err = rabbitCh.ExchangeDeclare(
-		"incidentes",
-		amqp.ExchangeTopic,
-		true,  // durable
-		false, // auto-delete
-		false, // internal
-		false, // no-wait
-		nil,   // arguments
+		ExchangeName, // cityt.cleaning.incidents
+		ExchangeType, // topic
+		true, 		  // durable
+		false, 		  // auto-deleted
+		false, 		  // internal
+		false, 		  // no-wait
+		nil,		  // arguments
 	)
+
 	if err != nil {
-		log.Printf("Warning: Failed to declare exchange: %v", err)
-		return err
+		return fmt.Errorf("failed to delcare exchange: %v", err)
 	}
 
-	log.Println("Connected to RabbitMQ successfully")
+	log.Printf("Connected to RabbitMQ. Exchange '%s' is ready.", ExchangeName)
 	return nil
+
 }
 
-// PublishEvent publica un evento a RabbitMQ
-func PublishEvent(eventType string, payload map[string]interface{}) error {
+func PublishEvent(routingKey string, payload map[string]interface{}) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	if rabbitConn == nil || rabbitCh == nil {
-		log.Println("RabbitMQ not connected, skipping event publication")
-		return nil
+	if RabbitConn == nil || rabbitCh == nil || RabbitConn.IsClosed() {
+		// Intento simple de reconexion o fallo rapido 
+		log.Println("RabbitMQ connection lost or not initialized")
+		return fmt.Errorf("connection closed")
 	}
 
-	// Agregar timestamp al payload
-	payload["timestamp"] = time.Now().Format(time.RFC3339)
-	payload["event_type"] = eventType
+	// Metodos utiles 
+
+	payload["event_timestamp"] = time.Now().UTC().Format(time.RFC3339)
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Printf("Failed to marshal event: %v", err)
-		return err
+		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
 
-	// Routing key: incidente.{eventType}
-	routingKey := fmt.Sprintf("incidente.%s", eventType)
-
 	err = rabbitCh.Publish(
-		"incidentes",
-		routingKey,
-		false, // mandatory
-		false, // immediate
+		ExchangeName, // city.cleaning.incidents
+		routingKey,   // Ej: incidents.submitted.v1
+		false,        // mandatory
+		false,        // immediate
 		amqp.Publishing{
-			ContentType: "application/json",
-			Body:        body,
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent, // Importante para no perder mensajes si Rabbit se reinicia
+			MessageId:    fmt.Sprintf("%v", time.Now().UnixNano()),
+			Timestamp:    time.Now(),
+			Body:         body,
 		},
 	)
 
 	if err != nil {
-		log.Printf("Failed to publish event to RabbitMQ: %v", err)
-		return err
+		return fmt.Errorf("failed to publish: %v", err)
 	}
 
-	log.Printf("Event published to RabbitMQ - Type: %s, RoutingKey: %s", eventType, routingKey)
+	log.Printf("Event published -> Exchange: %s | Key: %s", ExchangeName, routingKey)
 	return nil
 }
 
-// CloseRabbitMQ cierra la conexión a RabbitMQ
-func CloseRabbitMQ() error {
+func CloseRabbitMQ() {
 	mu.Lock()
 	defer mu.Unlock()
-
 	if rabbitCh != nil {
 		rabbitCh.Close()
 	}
-	if rabbitConn != nil {
-		return rabbitConn.Close()
+	if RabbitConn != nil {
+		RabbitConn.Close()
 	}
-	return nil
 }
+

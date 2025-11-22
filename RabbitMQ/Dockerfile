@@ -14,15 +14,10 @@ ADD enabled_plugins /etc/rabbitmq/enabled_plugins
 ADD rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
 
 # Add definitions file (exchanges, queues, bindings)
+# This file includes user credentials and topology
 ADD rabbitmq-definitions.json /etc/rabbitmq/definitions.json
 
-# Add custom entrypoint script to create user from env vars
-# Copy and set permissions as root before switching to rabbitmq user
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh && \
-    chown rabbitmq:rabbitmq /usr/local/bin/docker-entrypoint.sh
-
-# Health check - Uses both AMQP ping and HTTP endpoint from Management UI
+# Health check - Uses HTTP endpoint from Management UI
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:15672/api/alarms || exit 1
 
@@ -32,5 +27,5 @@ EXPOSE 5672 15672 25672
 # Switch to rabbitmq user for security
 USER rabbitmq
 
-# Use custom entrypoint
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+# Use default RabbitMQ entrypoint (no custom script needed)
+# The official image will load definitions.json automatically

@@ -3,8 +3,8 @@ package commands
 import (
 	"errors"
 
-	"github.com/Andres09xZ/latacunga_clean_app/internal/auth"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/cqrs/queries"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/auth"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/cqrs/queries"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -50,3 +50,4 @@ func (h *LoginHandler) Handle(cmd LoginCommand) (string, string, error) {
 
 	return access, refresh, nil
 }
+

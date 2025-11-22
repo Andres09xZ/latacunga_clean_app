@@ -1,0 +1,105 @@
+basePath: /
+definitions:
+  main.ValidateRequest:
+    properties:
+      notes:
+        example: Incidente verificado por administrador
+        type: string
+      status:
+        description: incidente_valido o incidente_rechazado
+        example: incidente_valido
+        type: string
+    required:
+    - status
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: API para validación manual de incidentes por administradores (con BD
+    propia)
+  title: Validation Service API
+  version: "1.0"
+paths:
+  /api/v1/incidents/{id}/validate:
+    post:
+      consumes:
+      - application/json
+      description: Valida o rechaza un incidente manualmente (solo administradores)
+      parameters:
+      - description: ID del incidente
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Estado de validación
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/main.ValidateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Incidente validado exitosamente
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Incidente no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error al validar
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Validar incidente
+      tags:
+      - Validation
+  /api/v1/incidents/pending:
+    get:
+      description: Obtiene todos los incidentes con estado 'pendiente_validacion'
+        de la BD local
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de incidentes pendientes
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error al obtener incidentes
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Listar incidentes pendientes
+      tags:
+      - Validation
+  /health:
+    get:
+      description: Verifica el estado del servicio y la base de datos
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check
+      tags:
+      - Health
+swagger: "2.0"

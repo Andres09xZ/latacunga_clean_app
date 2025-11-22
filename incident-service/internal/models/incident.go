@@ -20,9 +20,8 @@ type IncidentStatus string
 
 const (
 	IncidentStatusNoValidado IncidentStatus = "incidente_no_validado"
-	IncidentStatusValido    IncidentStatus = "incidente_valido"
+	IncidentStatusValido     IncidentStatus = "incidente_valido"
 	IncidentStatusRechazado  IncidentStatus = "incidente_rechazado"
-	
 )
 
 // GeoPoint representa un punto geográfico simple (para parsing)
@@ -147,7 +146,7 @@ type LocationResponse struct {
 // IncidentResponse es el DTO de respuesta de un incidente
 type IncidentResponse struct {
 	ID             string                       `json:"id"`
-	IdempotencyKey string                       `json:"idempotency_key"`
+	IdempotencyKey string                       `json:"idempotency_key,omitempty"` // Solo si se proporcionó
 	ReporterKind   string                       `json:"reporter_kind"`
 	ReporterID     *string                      `json:"reporter_id,omitempty"`
 	Type           string                       `json:"type"`

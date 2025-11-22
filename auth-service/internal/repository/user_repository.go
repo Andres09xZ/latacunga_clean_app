@@ -3,8 +3,8 @@ package repository
 import (
 	"errors"
 
-	"github.com/Andres09xZ/latacunga_clean_app/internal/database"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/models"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -16,8 +16,7 @@ func CreateUser(u *models.User, plainPassword string) error {
 	if err != nil {
 		return err
 	}
-	hs := string(hash)
-	u.PasswordHash = &hs
+	u.PasswordHash = string(hash)
 	return database.DB.Create(u).Error
 }
 
@@ -67,10 +66,8 @@ func Authenticate(email, plainPassword string) (*models.User, error) {
 		// usuario no existe
 		return nil, nil
 	}
-	if u.PasswordHash == nil {
-		return nil, nil
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(plainPassword)); err != nil {
+
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(plainPassword)); err != nil {
 		// contraseña no coincide
 		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
 			return nil, nil
@@ -93,7 +90,7 @@ func ChangePassword(id uint, newPlain string) error {
 	if err != nil {
 		return err
 	}
-	hs := string(hash)
-	u.PasswordHash = &hs
+	u.PasswordHash = string(hash)
 	return UpdateUser(u)
 }
+

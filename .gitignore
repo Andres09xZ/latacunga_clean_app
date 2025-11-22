@@ -1,1 +1,40 @@
+# Ignore environment files
+.env
+.env.*
+**/.env
+
+# Ignore private keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.crt
+
+# Ignore OS and editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Ignore compiled binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Node / Python / Go caches
+__pycache__/
+*.pyc
+bin/
+build/
+
+# Ignore sensitive data folders
+data/private/
+
+# Ignore logs
+*.log
+
+# Ignore local credentials and secrets
+credentials.json
+secret-*.json
 .env

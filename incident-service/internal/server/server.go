@@ -24,6 +24,9 @@ func Start() {
 	}
 	defer messaging.CloseRabbitMQ()
 
+	// Iniciar consumidor de resultados de validación
+	messaging.StartValidationConsumer()
+
 	// AutoMigrate no es necesario ya que usamos migraciones SQL
 	// pero lo dejamos para sincronizar el schema de GORM
 	database.DB.AutoMigrate(
@@ -40,10 +43,8 @@ func Start() {
 	docs.SwaggerInfo.BasePath = ""
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Health check
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok", "service": "incident-service"})
-	})
+	// Health check con verificación de dependencias
+	r.GET("/health", handlers.CheckHealth)
 
 	// Incident routes (offline-first, ciudadanos)
 	// CreateIncident: Requiere JWT (extrae reporter_kind y reporter_id del token, solo ciudadanos)

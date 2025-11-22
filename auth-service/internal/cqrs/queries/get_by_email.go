@@ -1,7 +1,7 @@
 package queries
 
 import (
-	"github.com/Andres09xZ/latacunga_clean_app/internal/models"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
 	"gorm.io/gorm"
 )
 

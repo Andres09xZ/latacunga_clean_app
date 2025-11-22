@@ -9,122 +9,190 @@ const docTemplate = `{
     "info": {
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
-        "contact": {},
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "Soporte API",
+            "email": "soporte@latacunga.gob.ec"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/health": {
-            "get": {
-                "description": "Verifica el estado del servicio",
-                "produces": ["application/json"],
-                "tags": ["Health"],
-                "summary": "Health Check",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "status": {"type": "string"},
-                                "service": {"type": "string"}
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/v1/incidents": {
             "get": {
-                "description": "Obtiene lista paginada de incidentes con filtros opcionales",
-                "produces": ["application/json"],
-                "tags": ["Incidents"],
-                "summary": "Listar Incidentes",
+                "description": "Obtiene una lista paginada de incidentes con filtros opcionales por tipo, estado y fecha",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Incidents"
+                ],
+                "summary": "Listar incidentes",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Número de página",
+                        "description": "Número de página (default: 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Registros por página",
+                        "description": "Registros por página (default: 20, max: 100)",
                         "name": "page_size",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Filtrar por tipo",
+                        "description": "Filtrar por tipo: punto_acopio, zona_critica, animal_muerto, zona_reciclaje",
                         "name": "type",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Filtrar por estado",
+                        "description": "Filtrar por estado: incidente_no_validado, emitido, valido, rechazado, convertido_en_tarea, cerrado",
                         "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha inicial (YYYY-MM-DD)",
+                        "name": "from_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Fecha final (YYYY-MM-DD)",
+                        "name": "to_date",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Lista de incidentes con metadatos de paginación",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             },
             "post": {
-                "security": [{"BearerAuth": []}],
-                "description": "Crea un nuevo incidente con soporte offline-first",
-                "consumes": ["application/json"],
-                "produces": ["application/json"],
-                "tags": ["Incidents"],
-                "summary": "Crear Incidente",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Crea un incidente reportado por un ciudadano. Requiere autenticación JWT. El campo 'idempotency_key' es OPCIONAL y permite prevenir duplicados: si se envía la misma clave dos veces, se retorna el incidente existente en lugar de crear uno nuevo. Si no se proporciona, se permite la creación de múltiples incidentes (útil para desarrollo).",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Incidents"
+                ],
+                "summary": "Crear un nuevo incidente",
                 "parameters": [
                     {
-                        "description": "Datos del incidente",
+                        "description": "Datos del incidente a crear",
                         "name": "incident",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object",
-                            "required": ["type", "title", "latitude", "longitude"],
-                            "properties": {
-                                "idempotency_key": {"type": "string"},
-                                "type": {"type": "string"},
-                                "title": {"type": "string"},
-                                "description": {"type": "string"},
-                                "latitude": {"type": "number"},
-                                "longitude": {"type": "number"},
-                                "photo_url": {"type": "string"},
-                                "evidencia": {"type": "string"}
-                            }
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.CreateIncidentRequest"
                         }
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "Incidente ya existía (idempotencia activada con idempotency_key)",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse"
+                        }
+                    },
                     "201": {
-                        "description": "Created"
+                        "description": "Incidente creado exitosamente",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse"
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Solicitud inválida",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autorizado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "403": {
-                        "description": "Forbidden"
+                        "description": "Prohibido - solo ciudadanos pueden crear incidentes",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflicto - idempotency_key usado pero recurso no encontrado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/api/v1/incidents/{id}": {
             "get": {
-                "description": "Obtiene los detalles completos de un incidente",
-                "produces": ["application/json"],
-                "tags": ["Incidents"],
-                "summary": "Obtener Incidente",
+                "description": "Obtiene información detallada de un incidente incluyendo adjuntos y eventos",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Incidents"
+                ],
+                "summary": "Obtener detalles de un incidente",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID del incidente",
+                        "description": "ID del incidente (UUID)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -132,109 +200,418 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not Found"
-                    }
-                }
-            }
-        },
-        "/api/v1/incidents/{id}/status": {
-            "put": {
-                "security": [{"BearerAuth": []}],
-                "description": "Actualiza el estado de un incidente (solo operador/admin)",
-                "consumes": ["application/json"],
-                "produces": ["application/json"],
-                "tags": ["Incidents"],
-                "summary": "Actualizar Estado",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ID del incidente",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Nuevo estado",
-                        "name": "status",
-                        "in": "body",
-                        "required": true,
+                        "description": "Detalles del incidente",
                         "schema": {
-                            "type": "object",
-                            "required": ["status"],
-                            "properties": {
-                                "status": {"type": "string"},
-                                "notes": {"type": "string"}
-                            }
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse"
                         }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "ID inválido",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
-                    "403": {
-                        "description": "Forbidden"
+                    "404": {
+                        "description": "Incidente no encontrado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
                 }
             }
         },
         "/api/v1/incidents/{id}/attachments": {
             "post": {
-                "security": [{"BearerAuth": []}],
-                "description": "Agrega una foto o archivo a un incidente",
-                "consumes": ["application/json"],
-                "produces": ["application/json"],
-                "tags": ["Incidents"],
-                "summary": "Agregar Foto/Archivo",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Agrega una foto o archivo como evidencia a un incidente existente. Requiere autenticación.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Incidents"
+                ],
+                "summary": "Agregar adjunto a incidente",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "ID del incidente",
+                        "description": "ID del incidente (UUID)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Datos del archivo",
+                        "description": "Datos del adjunto",
                         "name": "attachment",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object",
-                            "required": ["file_url"],
-                            "properties": {
-                                "file_url": {"type": "string"},
-                                "description": {"type": "string"}
-                            }
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.AddIncidentAttachmentRequest"
                         }
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created"
+                        "description": "Adjunto agregado exitosamente",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Solicitud inválida",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autorizado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Incidente no encontrado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
                     }
+                }
+            }
+        },
+        "/api/v1/incidents/{id}/status": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Actualiza el estado de un incidente. Solo operadores y administradores pueden realizar esta acción.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Incidents"
+                ],
+                "summary": "Actualizar estado de incidente",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID del incidente (UUID)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Nuevo estado del incidente",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.UpdateIncidentStatusRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Incidente actualizado",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Solicitud inválida",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "No autorizado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Prohibido - se requiere rol de operador o admin",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Incidente no encontrado",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Error interno del servidor",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Verifica el estado de las dependencias del servicio (DB y RabbitMQ)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "Health check endpoint",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handlers.HealthResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.AddIncidentAttachmentRequest": {
+            "type": "object",
+            "required": [
+                "file_url"
+            ],
+            "properties": {
+                "file_url": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.CreateIncidentRequest": {
+            "type": "object",
+            "required": [
+                "latitude",
+                "longitude",
+                "title",
+                "type"
+            ],
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "idempotency_key": {
+                    "description": "Para offline-first",
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "photo_url": {
+                    "description": "Evidencia inicial (foto)",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentAttachmentResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "file_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "attachments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentAttachmentResponse"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "idempotency_key": {
+                    "description": "Solo si se proporcionó",
+                    "type": "string"
+                },
+                "incident_day": {
+                    "type": "string"
+                },
+                "location": {
+                    "$ref": "#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.LocationResponse"
+                },
+                "photos_count": {
+                    "type": "integer"
+                },
+                "reporter_id": {
+                    "type": "string"
+                },
+                "reporter_kind": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.LocationResponse": {
+            "type": "object",
+            "properties": {
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.UpdateIncidentStatusRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "emitido",
+                        "valido",
+                        "rechazado",
+                        "convertido_en_tarea",
+                        "cerrado"
+                    ]
+                }
+            }
+        },
+        "internal_handlers.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "deps": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
                 }
             }
         }
     },
     "securityDefinitions": {
         "BearerAuth": {
+            "description": "Ingrese el token JWT con el formato: Bearer {token}",
             "type": "apiKey",
             "name": "Authorization",
-            "in": "header",
-            "description": "JWT Authorization header usando el esquema Bearer. Ejemplo: 'Bearer {token}'"
+            "in": "header"
         }
     }
 }`
@@ -243,10 +620,10 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:8081",
-	BasePath:         "",
+	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Incident Service API",
-	Description:      "Servicio de gestión de incidentes con soporte offline-first y geolocalización PostGIS",
+	Description:      "API para el servicio de gestión de incidentes de limpieza de la ciudad",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

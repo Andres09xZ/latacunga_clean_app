@@ -3,7 +3,7 @@ package commands
 import (
 	"time"
 
-	"github.com/Andres09xZ/latacunga_clean_app/internal/models"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -39,3 +39,4 @@ func (h *RegisterHandler) Handle(cmd RegisterCommand) error {
 
 	return h.DB.Create(&user).Error
 }
+

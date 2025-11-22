@@ -1,0 +1,414 @@
+basePath: /
+definitions:
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.AddIncidentAttachmentRequest:
+    properties:
+      file_url:
+        type: string
+      mime_type:
+        type: string
+      size_bytes:
+        type: integer
+    required:
+    - file_url
+    type: object
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.CreateIncidentRequest:
+    properties:
+      address:
+        type: string
+      description:
+        type: string
+      idempotency_key:
+        description: Para offline-first
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      photo_url:
+        description: Evidencia inicial (foto)
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    required:
+    - latitude
+    - longitude
+    - title
+    - type
+    type: object
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentAttachmentResponse:
+    properties:
+      created_at:
+        type: string
+      file_url:
+        type: string
+      id:
+        type: string
+      mime_type:
+        type: string
+      size_bytes:
+        type: integer
+    type: object
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse:
+    properties:
+      address:
+        type: string
+      attachments:
+        items:
+          $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentAttachmentResponse'
+        type: array
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      idempotency_key:
+        description: Solo si se proporcionó
+        type: string
+      incident_day:
+        type: string
+      location:
+        $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.LocationResponse'
+      photos_count:
+        type: integer
+      reporter_id:
+        type: string
+      reporter_kind:
+        type: string
+      status:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.LocationResponse:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
+    type: object
+  github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.UpdateIncidentStatusRequest:
+    properties:
+      status:
+        enum:
+        - emitido
+        - valido
+        - rechazado
+        - convertido_en_tarea
+        - cerrado
+        type: string
+    required:
+    - status
+    type: object
+  internal_handlers.HealthResponse:
+    properties:
+      deps:
+        additionalProperties:
+          type: string
+        type: object
+      status:
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact:
+    email: soporte@latacunga.gob.ec
+    name: Soporte API
+  description: API para el servicio de gestión de incidentes de limpieza de la ciudad
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Incident Service API
+  version: "1.0"
+paths:
+  /api/v1/incidents:
+    get:
+      description: Obtiene una lista paginada de incidentes con filtros opcionales
+        por tipo, estado y fecha
+      parameters:
+      - description: 'Número de página (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Registros por página (default: 20, max: 100)'
+        in: query
+        name: page_size
+        type: integer
+      - description: 'Filtrar por tipo: punto_acopio, zona_critica, animal_muerto,
+          zona_reciclaje'
+        in: query
+        name: type
+        type: string
+      - description: 'Filtrar por estado: incidente_no_validado, emitido, valido,
+          rechazado, convertido_en_tarea, cerrado'
+        in: query
+        name: status
+        type: string
+      - description: Fecha inicial (YYYY-MM-DD)
+        in: query
+        name: from_date
+        type: string
+      - description: Fecha final (YYYY-MM-DD)
+        in: query
+        name: to_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de incidentes con metadatos de paginación
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Listar incidentes
+      tags:
+      - Incidents
+    post:
+      consumes:
+      - application/json
+      description: 'Crea un incidente reportado por un ciudadano. Requiere autenticación
+        JWT. El campo ''idempotency_key'' es OPCIONAL y permite prevenir duplicados:
+        si se envía la misma clave dos veces, se retorna el incidente existente en
+        lugar de crear uno nuevo. Si no se proporciona, se permite la creación de
+        múltiples incidentes (útil para desarrollo).'
+      parameters:
+      - description: Datos del incidente a crear
+        in: body
+        name: incident
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.CreateIncidentRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Incidente ya existía (idempotencia activada con idempotency_key)
+          schema:
+            $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse'
+        "201":
+          description: Incidente creado exitosamente
+          schema:
+            $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse'
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Prohibido - solo ciudadanos pueden crear incidentes
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflicto - idempotency_key usado pero recurso no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Crear un nuevo incidente
+      tags:
+      - Incidents
+  /api/v1/incidents/{id}:
+    get:
+      description: Obtiene información detallada de un incidente incluyendo adjuntos
+        y eventos
+      parameters:
+      - description: ID del incidente (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Detalles del incidente
+          schema:
+            $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse'
+        "400":
+          description: ID inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Incidente no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Obtener detalles de un incidente
+      tags:
+      - Incidents
+  /api/v1/incidents/{id}/attachments:
+    post:
+      consumes:
+      - application/json
+      description: Agrega una foto o archivo como evidencia a un incidente existente.
+        Requiere autenticación.
+      parameters:
+      - description: ID del incidente (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del adjunto
+        in: body
+        name: attachment
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.AddIncidentAttachmentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Adjunto agregado exitosamente
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Incidente no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Agregar adjunto a incidente
+      tags:
+      - Incidents
+  /api/v1/incidents/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza el estado de un incidente. Solo operadores y administradores
+        pueden realizar esta acción.
+      parameters:
+      - description: ID del incidente (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Nuevo estado del incidente
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.UpdateIncidentStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Incidente actualizado
+          schema:
+            $ref: '#/definitions/github_com_Andres09xZ_latacunga_clean_app_incident-service_internal_models.IncidentResponse'
+        "400":
+          description: Solicitud inválida
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: No autorizado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Prohibido - se requiere rol de operador o admin
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Incidente no encontrado
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Actualizar estado de incidente
+      tags:
+      - Incidents
+  /health:
+    get:
+      description: Verifica el estado de las dependencias del servicio (DB y RabbitMQ)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handlers.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/internal_handlers.HealthResponse'
+      summary: Health check endpoint
+      tags:
+      - health
+securityDefinitions:
+  BearerAuth:
+    description: 'Ingrese el token JWT con el formato: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -7,8 +7,9 @@ services:
     image:
       url: mrengineer09/rabbitmq:plugins
     
-    # Port configuration
-    port: 5672
+    # Port configuration - Use 15672 for Management UI (web interface)
+    # For AMQP connections use 5672, but Render web services need HTTP
+    port: 15672
     
     # Health check configuration for Render
     healthCheck:
@@ -19,13 +20,8 @@ services:
       startPeriod: 60
       interval: 30
     
-    # Environment variables from .env
-    envVars:
-      - key: RABBITMQ_DEFAULT_USER
-        value: tesis
-      - key: RABBITMQ_DEFAULT_PASS
-        value: tesis
-        isPrivate: true
+    # No environment variables needed - credentials are embedded in definitions.json
+    # User: tesis, Password: tesis
     
     # Persistent volume for RabbitMQ data
     disk:

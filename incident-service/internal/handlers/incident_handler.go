@@ -18,9 +18,22 @@ import (
 	"gorm.io/gorm"
 )
 
-// CreateIncident crea un nuevo incidente con captura automática de día
-// Soporta operación offline-first con Idempotency-Key
-// Extrae reporter_kind y reporter_id del JWT token
+// CreateIncident crea un nuevo incidente
+// @Summary Crear un nuevo incidente
+// @Description Crea un incidente reportado por un ciudadano. Requiere autenticación JWT. El campo 'idempotency_key' es OPCIONAL y permite prevenir duplicados: si se envía la misma clave dos veces, se retorna el incidente existente en lugar de crear uno nuevo. Si no se proporciona, se permite la creación de múltiples incidentes (útil para desarrollo).
+// @Tags Incidents
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param incident body models.CreateIncidentRequest true "Datos del incidente a crear"
+// @Success 201 {object} models.IncidentResponse "Incidente creado exitosamente"
+// @Success 200 {object} models.IncidentResponse "Incidente ya existía (idempotencia activada con idempotency_key)"
+// @Failure 400 {object} map[string]string "Solicitud inválida"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 403 {object} map[string]string "Prohibido - solo ciudadanos pueden crear incidentes"
+// @Failure 409 {object} map[string]string "Conflicto - idempotency_key usado pero recurso no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/incidents [post]
 func CreateIncident(c *gin.Context) {
 	var req models.CreateIncidentRequest
 
@@ -61,31 +74,33 @@ func CreateIncident(c *gin.Context) {
 	reporterID := userID.(string)
 	db := database.DB
 
-	// ==== GENERAR IDEMPOTENCY KEY AUTOMATICAMENTE ====
-	// Si no viene en el request, se genera una automáticamente para garantizar idempotencia
+	// ==== IDEMPOTENCIA: Verificar si ya existe (solo si se proporciona idempotency_key) ====
+	// La idempotency_key es OPCIONAL. Si el cliente la proporciona, se verifica duplicados.
+	// Si NO la proporciona, se crea el incidente normalmente (permitiendo duplicados si el cliente envía múltiples requests).
 	idempotencyKey := req.IdempotencyKey
-	if idempotencyKey == "" {
-		// Generar una clave única: "incident-{userId}-{timestamp}-{uuid}"
-		idempotencyKey = fmt.Sprintf("incident-%s-%d-%s", reporterID, time.Now().UnixNano(), uuid.New().String())
-	}
-
-	// ==== IDEMPOTENCIA: Verificar si ya existe ====
-	var existingKey models.IdempotencyKey
-	if err := db.Where("key = ?", idempotencyKey).First(&existingKey).Error; err == nil {
-		// La clave ya existe, retornar el recurso existente
-		if existingKey.ResourceID != nil {
-			var existingIncident models.Incident
-			if err := db.Where("id = ?", existingKey.ResourceID).First(&existingIncident).Error; err == nil {
-				response := convertIncidentToResponseWithKey(&existingIncident, idempotencyKey)
-				c.JSON(http.StatusOK, response)
-				return
+	if idempotencyKey != "" {
+		// El cliente proporcionó una clave, verificar si ya existe
+		var existingKey models.IdempotencyKey
+		if err := db.Where("key = ?", idempotencyKey).First(&existingKey).Error; err == nil {
+			// La clave ya existe, retornar el recurso existente
+			if existingKey.ResourceID != nil {
+				var existingIncident models.Incident
+				if err := db.Where("id = ?", existingKey.ResourceID).First(&existingIncident).Error; err == nil {
+					log.Printf("Idempotency: Returning existing incident %s for key %s", existingIncident.ID, idempotencyKey)
+					response := convertIncidentToResponseWithKey(&existingIncident, idempotencyKey)
+					c.JSON(http.StatusOK, response)
+					return
+				}
 			}
+			// Si la clave existe pero no el recurso, es un error
+			c.JSON(http.StatusConflict, gin.H{"error": "Idempotency key already used but resource not found"})
+			return
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// Error de base de datos diferente a "no encontrado"
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
+			return
 		}
-		c.JSON(http.StatusConflict, gin.H{"error": "Idempotency key already used but resource not found"})
-		return
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: " + err.Error()})
-		return
+		// Si llegamos aquí, la clave NO existe y podemos crear el incidente
 	}
 
 	// ==== CREAR INCIDENTE ====
@@ -132,14 +147,13 @@ func CreateIncident(c *gin.Context) {
 		UpdatedAt:    time.Now(),
 	}
 
-	// Registrar evento 
+	// Registrar evento
 	recordIncidentEvent(&incident, "incidente_creado")
 
 	// Solicitar validacion
 	if err := services.RequestValidation(&incident); err != nil {
 		log.Printf("Warning: Failed to request validation: %v", err)
 	}
-	
 
 	// Crear incidente en la base de datos
 	if err := db.Create(&incident).Error; err != nil {
@@ -161,15 +175,18 @@ func CreateIncident(c *gin.Context) {
 		}
 	}
 
-	// ==== REGISTRAR IDEMPOTENCIA ====
-	// Siempre registrar la idempotency key (ahora generada automáticamente)
-	idempotencyKeyRecord := models.IdempotencyKey{
-		Key:        idempotencyKey,
-		ResourceID: &incident.ID,
-		CreatedAt:  time.Now(),
-	}
-	if err := db.Create(&idempotencyKeyRecord).Error; err != nil {
-		log.Printf("Warning: Failed to save idempotency key: %v", err)
+	// ==== REGISTRAR IDEMPOTENCIA (solo si se proporcionó idempotency_key) ====
+	if idempotencyKey != "" {
+		idempotencyKeyRecord := models.IdempotencyKey{
+			Key:        idempotencyKey,
+			ResourceID: &incident.ID,
+			CreatedAt:  time.Now(),
+		}
+		if err := db.Create(&idempotencyKeyRecord).Error; err != nil {
+			log.Printf("Warning: Failed to save idempotency key: %v", err)
+		} else {
+			log.Printf("Idempotency: Registered key %s for incident %s", idempotencyKey, incident.ID)
+		}
 	}
 
 	// ==== REGISTRAR EVENTO ====
@@ -178,11 +195,28 @@ func CreateIncident(c *gin.Context) {
 	// ==== PUBLICAR EVENTO A RABBITMQ ====
 	emitIncidentEvent(&incident, "incidente_pendiente")
 
-	response := convertIncidentToResponseWithKey(&incident, idempotencyKey)
+	// Preparar respuesta (incluir idempotency_key solo si se proporcionó)
+	var response models.IncidentResponse
+	if idempotencyKey != "" {
+		response = convertIncidentToResponseWithKey(&incident, idempotencyKey)
+	} else {
+		response = convertIncidentToResponse(&incident)
+	}
+
 	c.JSON(http.StatusCreated, response)
 }
 
 // GetIncident obtiene los detalles de un incidente por ID
+// @Summary Obtener detalles de un incidente
+// @Description Obtiene información detallada de un incidente incluyendo adjuntos y eventos
+// @Tags Incidents
+// @Produce json
+// @Param id path string true "ID del incidente (UUID)"
+// @Success 200 {object} models.IncidentResponse "Detalles del incidente"
+// @Failure 400 {object} map[string]string "ID inválido"
+// @Failure 404 {object} map[string]string "Incidente no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/incidents/{id} [get]
 func GetIncident(c *gin.Context) {
 	incidentID := c.Param("id")
 
@@ -208,6 +242,19 @@ func GetIncident(c *gin.Context) {
 }
 
 // ListIncidents lista incidentes con paginación y filtros
+// @Summary Listar incidentes
+// @Description Obtiene una lista paginada de incidentes con filtros opcionales por tipo, estado y fecha
+// @Tags Incidents
+// @Produce json
+// @Param page query int false "Número de página (default: 1)"
+// @Param page_size query int false "Registros por página (default: 20, max: 100)"
+// @Param type query string false "Filtrar por tipo: punto_acopio, zona_critica, animal_muerto, zona_reciclaje"
+// @Param status query string false "Filtrar por estado: incidente_no_validado, emitido, valido, rechazado, convertido_en_tarea, cerrado"
+// @Param from_date query string false "Fecha inicial (YYYY-MM-DD)"
+// @Param to_date query string false "Fecha final (YYYY-MM-DD)"
+// @Success 200 {object} map[string]interface{} "Lista de incidentes con metadatos de paginación"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/incidents [get]
 func ListIncidents(c *gin.Context) {
 	db := database.DB
 
@@ -253,12 +300,16 @@ func ListIncidents(c *gin.Context) {
 		return
 	}
 
-	responses := make([]models.IncidentResponse, len(incidents))
-	for i, inc := range incidents {
-		responses[i] = convertIncidentToResponse(&inc)
+	// Convertir a respuestas
+	responses := make([]models.IncidentResponse, 0, len(incidents))
+	for _, inc := range incidents {
+		responses = append(responses, convertIncidentToResponse(&inc))
 	}
 
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+	if totalPages == 0 {
+		totalPages = 1
+	}
 
 	response := models.ListIncidentsResponse{
 		Incidents:  responses,
@@ -272,6 +323,21 @@ func ListIncidents(c *gin.Context) {
 }
 
 // UpdateIncidentStatus actualiza el estado de un incidente
+// @Summary Actualizar estado de incidente
+// @Description Actualiza el estado de un incidente. Solo operadores y administradores pueden realizar esta acción.
+// @Tags Incidents
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID del incidente (UUID)"
+// @Param status body models.UpdateIncidentStatusRequest true "Nuevo estado del incidente"
+// @Success 200 {object} models.IncidentResponse "Incidente actualizado"
+// @Failure 400 {object} map[string]string "Solicitud inválida"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 403 {object} map[string]string "Prohibido - se requiere rol de operador o admin"
+// @Failure 404 {object} map[string]string "Incidente no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/incidents/{id}/status [put]
 func UpdateIncidentStatus(c *gin.Context) {
 	incidentID := c.Param("id")
 
@@ -330,6 +396,20 @@ func UpdateIncidentStatus(c *gin.Context) {
 }
 
 // AddIncidentAttachment agrega una foto/archivo a un incidente
+// @Summary Agregar adjunto a incidente
+// @Description Agrega una foto o archivo como evidencia a un incidente existente. Requiere autenticación.
+// @Tags Incidents
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "ID del incidente (UUID)"
+// @Param attachment body models.AddIncidentAttachmentRequest true "Datos del adjunto"
+// @Success 201 {object} map[string]interface{} "Adjunto agregado exitosamente"
+// @Failure 400 {object} map[string]string "Solicitud inválida"
+// @Failure 401 {object} map[string]string "No autorizado"
+// @Failure 404 {object} map[string]string "Incidente no encontrado"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/incidents/{id}/attachments [post]
 func AddIncidentAttachment(c *gin.Context) {
 	incidentID := c.Param("id")
 
@@ -486,20 +566,33 @@ func recordIncidentEvent(incident *models.Incident, eventType string) {
 	}
 }
 
-// emitIncidentEvent publica un evento de incidente a RabbitMQ
+// emitIncidentEvent publica un evento de incidente completo a RabbitMQ
 func emitIncidentEvent(incident *models.Incident, eventType string) {
+	// Extraer latitud y longitud del campo location (POINT(lng lat))
+	var latitude, longitude float64
+	fmt.Sscanf(incident.Location, "POINT(%f %f)", &longitude, &latitude)
+
 	payload := map[string]interface{}{
 		"id":            incident.ID,
 		"reporter_kind": incident.ReporterKind,
 		"reporter_id":   incident.ReporterID,
 		"type":          incident.Type,
-		"status":        incident.Status,
-		"incident_day":  incident.IncidentDay,
-		"photos_count":  incident.PhotosCount,
-		"created_at":    incident.CreatedAt,
+		"description":   incident.Description,
+		"location": map[string]interface{}{
+			"latitude":  latitude,
+			"longitude": longitude,
+		},
+		"address":      incident.Address,
+		"status":       incident.Status,
+		"incident_day": incident.IncidentDay,
+		"photos_count": incident.PhotosCount,
+		"created_at":   incident.CreatedAt,
+		"updated_at":   incident.UpdatedAt,
 	}
 
 	if err := messaging.PublishEvent(eventType, payload); err != nil {
 		log.Printf("Warning: Failed to emit event to RabbitMQ: %v", err)
+	} else {
+		log.Printf("Incident event published successfully: type=%s, incident_id=%s", eventType, incident.ID)
 	}
 }

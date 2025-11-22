@@ -20,9 +20,9 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/Andres09xZ/latacunga_clean_app/internal/database"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/models"
-	"github.com/Andres09xZ/latacunga_clean_app/internal/server"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/server"
 	"gorm.io/gorm"
 )
 
@@ -504,3 +504,4 @@ func tengoUnActivo(tokenType string) error {
 	}
 	return nil
 }
+
