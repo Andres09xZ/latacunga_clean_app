@@ -1,6 +1,8 @@
 services:
   rabbitmq:
-    image: mrengineer09/rabbitmq:plugins
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: rabbitmq
     ports:
       - "0.0.0.0:5672:5672"

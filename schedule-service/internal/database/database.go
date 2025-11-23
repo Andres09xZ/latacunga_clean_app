@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -12,13 +14,22 @@ import (
 
 // RunMigrations runs all pending migrations
 func Connect(dbURL string) (*gorm.DB, error) {
-	conn, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	// Configuración para evitar el error de cached plan en Neon PostgreSQL
+	config := &gorm.Config{
+		PrepareStmt: false, // Deshabilitar prepared statements para evitar cache issues
+	}
+
+	conn, err := gorm.Open(postgres.Open(dbURL), config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	log.Println("✅ Connected to PostgreSQL")
 
+	if os.Getenv("SKIP_MIGRATIONS") == "1" {
+		log.Println("⏭️  SKIP_MIGRATIONS=1 -> no se ejecutan migraciones")
+		return conn, nil
+	}
 	// Run migrations
 	if err := RunMigrations(conn); err != nil {
 		log.Printf("⚠️  Warning: Migrations failed: %v", err)
@@ -29,37 +40,33 @@ func Connect(dbURL string) (*gorm.DB, error) {
 
 // RunMigrations runs all pending migrations
 func RunMigrations(db *gorm.DB) error {
-	log.Println("Running database migrations...")
-
-	// Try multiple migration file paths
-	migrationPaths := []string{
-		"migrations/001_create_schedule_schema.sql",
-		"./migrations/001_create_schedule_schema.sql",
-		"../../../migrations/001_create_schedule_schema.sql",
-		filepath.Join(os.Getenv("PWD"), "migrations/001_create_schedule_schema.sql"),
+	log.Println("🔄 Running SQL migrations (all *.sql in migrations folder)...")
+	base := "migrations"
+	entries, err := os.ReadDir(base)
+	if err != nil {
+		return fmt.Errorf("cannot read migrations dir: %w", err)
 	}
-
-	var migrationSQL []byte
-	var lastErr error
-
-	for _, migrationPath := range migrationPaths {
-		data, err := os.ReadFile(migrationPath)
-		if err == nil {
-			migrationSQL = data
-			log.Printf("✅ Found migration file: %s", migrationPath)
-			break
+	var files []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".sql") {
+			files = append(files, filepath.Join(base, e.Name()))
 		}
-		lastErr = err
 	}
-
-	if migrationSQL == nil {
-		return fmt.Errorf("failed to read migration file from any path: %w", lastErr)
+	sort.Strings(files)
+	for _, f := range files {
+		content, err := os.ReadFile(f)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", f, err)
+		}
+		if len(strings.TrimSpace(string(content))) == 0 {
+			continue
+		}
+		if err := db.Exec(string(content)).Error; err != nil {
+			return fmt.Errorf("exec %s failed: %w", f, err)
+		}
+		log.Printf("✅ Applied %s", filepath.Base(f))
 	}
-
-	if err := db.Exec(string(migrationSQL)).Error; err != nil {
-		return fmt.Errorf("failed to execute migration: %w", err)
-	}
-
-	log.Println("✅ Database migrations completed")
+	// mark end
+	log.Println("✅ All migrations applied")
 	return nil
 }

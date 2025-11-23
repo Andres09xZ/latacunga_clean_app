@@ -16,10 +16,10 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 -- PASO 2: Crear tabla cleaning_zones
 -- ============================================================
 
--- Eliminar tabla si existe (para desarrollo)
-DROP TABLE IF EXISTS cleaning_zones CASCADE;
+-- IMPORTANTE: NO eliminar la tabla en producción - las zonas son persistentes
+-- DROP TABLE IF EXISTS cleaning_zones CASCADE; -- COMENTADO para preservar datos
 
-CREATE TABLE cleaning_zones (
+CREATE TABLE IF NOT EXISTS cleaning_zones (
     -- Identificador único
     id SERIAL PRIMARY KEY,
     
@@ -51,15 +51,15 @@ CREATE TABLE cleaning_zones (
 
 -- Índice espacial GIST (CRÍTICO para consultas geográficas)
 -- Permite búsquedas rápidas tipo "¿qué zona contiene este punto?"
-CREATE INDEX idx_zones_geom ON cleaning_zones USING GIST (geom);
+CREATE INDEX IF NOT EXISTS idx_zones_geom ON cleaning_zones USING GIST (geom);
 
 -- Índices para búsquedas comunes
-CREATE INDEX idx_zones_route_name ON cleaning_zones (route_name);
-CREATE INDEX idx_zones_schedule_day ON cleaning_zones (schedule_day);
-CREATE INDEX idx_zones_zone_name ON cleaning_zones (zone_name);
+CREATE INDEX IF NOT EXISTS idx_zones_route_name ON cleaning_zones (route_name);
+CREATE INDEX IF NOT EXISTS idx_zones_schedule_day ON cleaning_zones (schedule_day);
+CREATE INDEX IF NOT EXISTS idx_zones_zone_name ON cleaning_zones (zone_name);
 
 -- Índice compuesto para consultas por ruta y día
-CREATE INDEX idx_zones_route_day ON cleaning_zones (route_name, schedule_day);
+CREATE INDEX IF NOT EXISTS idx_zones_route_day ON cleaning_zones (route_name, schedule_day);
 
 -- ============================================================
 -- PASO 4: Comentarios para documentación
@@ -89,6 +89,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Trigger para calcular área automáticamente al insertar/actualizar
+DROP TRIGGER IF EXISTS trigger_calculate_area ON cleaning_zones;
 CREATE TRIGGER trigger_calculate_area
     BEFORE INSERT OR UPDATE OF geom
     ON cleaning_zones

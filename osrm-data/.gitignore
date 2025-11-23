@@ -1,0 +1,10 @@
+# Archivos de datos OSRM (no subir a Git)
+*.osm.pbf
+*.osm
+*.osrm
+*.osrm.*
+
+# Mantener solo la documentación
+!README.md
+!INSTALLATION.md
+!*.ps1

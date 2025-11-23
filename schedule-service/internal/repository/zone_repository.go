@@ -1,205 +1,141 @@
 package repository
 
 import (
+	"errors"
+	"fmt"
+	"time"
+
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/models"
 	"gorm.io/gorm"
 )
 
-// ZoneRepository maneja las operaciones de base de datos para zonas
-type ZoneRepository struct {
-	db *gorm.DB
+// IZoneRepository define las operaciones requeridas por el servicio de planificación.
+type IZoneRepository interface {
+	FindZoneByPoint(lat, lon float64) (*models.CleaningZone, error)
+	ListZones() ([]models.CleaningZone, error)
+	GetMetrics(zoneID uint) (*models.ZoneMetrics, error)
+	UpsertMetrics(m *models.ZoneMetrics) error
+	UpdateStatus(zoneID uint, status string) error
 }
 
-// NewZoneRepository crea una nueva instancia del repositorio
-func NewZoneRepository(db *gorm.DB) *ZoneRepository {
-	return &ZoneRepository{db: db}
-}
+type ZoneRepository struct{ db *gorm.DB }
 
-// FindAll retorna todas las zonas
-func (r *ZoneRepository) FindAll() ([]models.CleaningZone, error) {
+func NewZoneRepository(db *gorm.DB) *ZoneRepository { return &ZoneRepository{db: db} }
+
+func (r *ZoneRepository) ListZones() ([]models.CleaningZone, error) {
 	var zones []models.CleaningZone
-	// Omitir la columna geom para evitar errores de decodificación WKB en listados
-	err := r.db.Omit("Geom").Find(&zones).Error
-	return zones, err
+
+	// Usar query raw para evitar el error de cached plan en Neon PostgreSQL
+	query := `SELECT id, zone_name, route_name, schedule_day, points_count, area_km2, 
+	          geom, created_at, updated_at, schedule_config, status 
+	          FROM cleaning_zones ORDER BY id`
+
+	if err := r.db.Raw(query).Scan(&zones).Error; err != nil {
+		return nil, err
+	}
+	return zones, nil
 }
 
-// FindByID retorna una zona por su ID
-func (r *ZoneRepository) FindByID(id uint) (*models.CleaningZone, error) {
+// FindZoneByPoint: búsqueda espacial usando ST_Contains sobre MULTIPOLYGON.
+func (r *ZoneRepository) FindZoneByPoint(lat, lon float64) (*models.CleaningZone, error) {
 	var zone models.CleaningZone
-	err := r.db.Omit("Geom").First(&zone, id).Error
-	if err != nil {
+	// ST_MakePoint recibe (lon, lat) - orden X,Y
+	q := `SELECT * FROM cleaning_zones WHERE ST_Contains(geom, ST_SetSRID(ST_MakePoint($1, $2), 4326)) LIMIT 1`
+	if err := r.db.Raw(q, lon, lat).Scan(&zone).Error; err != nil {
 		return nil, err
 	}
-	return &zone, nil
-}
-
-// FindByRouteName retorna todas las zonas de una ruta específica
-func (r *ZoneRepository) FindByRouteName(routeName string) ([]models.CleaningZone, error) {
-	var zones []models.CleaningZone
-	err := r.db.Omit("Geom").Where("route_name = ?", routeName).Find(&zones).Error
-	return zones, err
-}
-
-// FindByScheduleDay retorna todas las zonas de un día específico
-func (r *ZoneRepository) FindByScheduleDay(day int) ([]models.CleaningZone, error) {
-	var zones []models.CleaningZone
-	err := r.db.Omit("Geom").Where("schedule_day = ?", day).Find(&zones).Error
-	return zones, err
-}
-
-// FindByRouteAndDay retorna la zona específica de una ruta en un día
-func (r *ZoneRepository) FindByRouteAndDay(routeName string, day int) (*models.CleaningZone, error) {
-	var zone models.CleaningZone
-	err := r.db.Omit("Geom").Where("route_name = ? AND schedule_day = ?", routeName, day).First(&zone).Error
-	if err != nil {
-		return nil, err
-	}
-	return &zone, nil
-}
-
-// FindZoneByPoint busca la zona que contiene un punto geográfico
-// Usa función PostGIS ST_Contains para búsqueda espacial
-func (r *ZoneRepository) FindZoneByPoint(latitude, longitude float64) (*models.ZoneSearchResult, error) {
-	var result models.ZoneSearchResult
-
-	query := `
-		SELECT 
-			cz.id as zone_id,
-			cz.zone_name,
-			cz.route_name,
-			CASE cz.schedule_day
-				WHEN 0 THEN 'Domingo'
-				WHEN 1 THEN 'Lunes'
-				WHEN 2 THEN 'Martes'
-				WHEN 3 THEN 'Miércoles'
-				WHEN 4 THEN 'Jueves'
-				WHEN 5 THEN 'Viernes'
-				WHEN 6 THEN 'Sábado'
-			END as day_name,
-			ST_Distance(
-				cz.geom::geography,
-				ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
-			) as distance_meters
-		FROM cleaning_zones cz
-		WHERE ST_Contains(
-			cz.geom,
-			ST_SetSRID(ST_MakePoint($2, $1), 4326)
-		)
-		ORDER BY distance_meters
-		LIMIT 1
-	`
-
-	err := r.db.Raw(query, latitude, longitude).Scan(&result).Error
-	if err != nil {
-		return nil, err
-	}
-
-	// Si no se encontró ninguna zona (result vacío), retornar error
-	if result.ZoneID == 0 {
+	if zone.ID == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
-
-	return &result, nil
+	return &zone, nil
 }
 
-// FindNearestZone busca la zona más cercana a un punto (aunque no lo contenga)
-func (r *ZoneRepository) FindNearestZone(latitude, longitude float64) (*models.ZoneSearchResult, error) {
-	var result models.ZoneSearchResult
-
-	query := `
-		SELECT 
-			cz.id as zone_id,
-			cz.zone_name,
-			cz.route_name,
-			CASE cz.schedule_day
-				WHEN 0 THEN 'Domingo'
-				WHEN 1 THEN 'Lunes'
-				WHEN 2 THEN 'Martes'
-				WHEN 3 THEN 'Miércoles'
-				WHEN 4 THEN 'Jueves'
-				WHEN 5 THEN 'Viernes'
-				WHEN 6 THEN 'Sábado'
-			END as day_name,
-			ST_Distance(
-				cz.geom::geography,
-				ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
-			) as distance_meters
-		FROM cleaning_zones cz
-		ORDER BY cz.geom::geography <-> ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography
-		LIMIT 1
-	`
-
-	err := r.db.Raw(query, latitude, longitude).Scan(&result).Error
-	if err != nil {
+func (r *ZoneRepository) GetMetrics(zoneID uint) (*models.ZoneMetrics, error) {
+	var m models.ZoneMetrics
+	if err := r.db.First(&m, zoneID).Error; err != nil {
 		return nil, err
 	}
-
-	return &result, nil
+	return &m, nil
 }
 
-// GetZonesByRoute retorna resumen agrupado por ruta
-func (r *ZoneRepository) GetZonesByRoute() ([]models.ZonesByRoute, error) {
-	var results []models.ZonesByRoute
-	err := r.db.Table("zones_by_route").Find(&results).Error
-	return results, err
+func (r *ZoneRepository) UpsertMetrics(m *models.ZoneMetrics) error {
+	// Use Save for upsert behavior
+	return r.db.Save(m).Error
 }
 
-// GetZonesByDay retorna resumen agrupado por día
-func (r *ZoneRepository) GetZonesByDay() ([]models.ZonesByDay, error) {
-	var results []models.ZonesByDay
-	err := r.db.Table("zones_by_day").Order("schedule_day").Find(&results).Error
-	return results, err
+func (r *ZoneRepository) UpdateStatus(zoneID uint, status string) error {
+	if status == "" {
+		return errors.New("status vacío")
+	}
+	return r.db.Model(&models.CleaningZone{}).Where("id = ?", zoneID).Update("status", status).Error
 }
 
-// GetZoneWithGeoJSON retorna una zona con su geometría en formato GeoJSON
-func (r *ZoneRepository) GetZoneWithGeoJSON(id uint) (map[string]interface{}, error) {
-	var result map[string]interface{}
-
-	query := `
-		SELECT 
-			id,
-			zone_name,
-			route_name,
-			schedule_day,
-			points_count,
-			area_km2,
-			ST_AsGeoJSON(geom) as geojson,
-			created_at,
-			updated_at
-		FROM cleaning_zones
-		WHERE id = $1
-	`
-
-	err := r.db.Raw(query, id).Scan(&result).Error
-	return result, err
+// IncrementScore aplica acumulación y determina si se supera el umbral.
+func (r *ZoneRepository) IncrementScore(zoneID uint, delta int) (*models.ZoneMetrics, bool, error) {
+	m, err := r.GetMetrics(zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			m = &models.ZoneMetrics{ZoneID: zoneID, Threshold: 50, CurrentScore: 0}
+		} else {
+			return nil, false, err
+		}
+	}
+	m.CurrentScore += delta
+	triggered := m.CurrentScore >= m.Threshold
+	if triggered {
+		now := time.Now().UTC()
+		m.LastTrigger = &now
+	}
+	if err := r.UpsertMetrics(m); err != nil {
+		return nil, false, err
+	}
+	return m, triggered, nil
 }
 
-// GetAllZonesAsGeoJSON retorna todas las zonas en formato GeoJSON FeatureCollection
-func (r *ZoneRepository) GetAllZonesAsGeoJSON() (string, error) {
-	var result string
+// ForceTrigger marca trigger sin alterar score necesariamente.
+func (r *ZoneRepository) ForceTrigger(zoneID uint, reason string) (*models.ZoneMetrics, error) {
+	m, err := r.GetMetrics(zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			m = &models.ZoneMetrics{ZoneID: zoneID, Threshold: 50, CurrentScore: 0}
+		} else {
+			return nil, err
+		}
+	}
+	now := time.Now().UTC()
+	m.LastTrigger = &now
+	if err := r.UpsertMetrics(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
-	query := `
-		SELECT jsonb_build_object(
-			'type', 'FeatureCollection',
-			'features', jsonb_agg(feature)
-		)::text
-		FROM (
-			SELECT jsonb_build_object(
-				'type', 'Feature',
-				'id', id,
-				'geometry', ST_AsGeoJSON(geom)::jsonb,
-				'properties', jsonb_build_object(
-					'zone_name', zone_name,
-					'route_name', route_name,
-					'schedule_day', schedule_day,
-					'points_count', points_count,
-					'area_km2', area_km2
-				)
-			) as feature
-			FROM cleaning_zones
-		) features
-	`
-
-	err := r.db.Raw(query).Scan(&result).Error
-	return result, err
+// UpdateThresholds permite actualizar múltiples umbrales.
+func (r *ZoneRepository) UpdateThresholds(th map[string]int) error {
+	for zoneName, value := range th {
+		if value <= 0 {
+			return fmt.Errorf("threshold inválido para %s", zoneName)
+		}
+		// Obtener zone id
+		var z models.CleaningZone
+		if err := r.db.Where("zone_name = ?", zoneName).First(&z).Error; err != nil {
+			return err
+		}
+		var m models.ZoneMetrics
+		if err := r.db.First(&m, z.ID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				m = models.ZoneMetrics{ZoneID: z.ID, Threshold: value}
+				if err := r.db.Create(&m).Error; err != nil {
+					return err
+				}
+			} else {
+				return err
+			}
+		} else {
+			if err := r.db.Model(&m).Update("threshold", value).Error; err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

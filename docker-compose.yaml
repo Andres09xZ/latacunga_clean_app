@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # 🗺️ Motor de Rutas - OSRM (Open Source Routing Machine)
+  routing-engine:
+    image: osrm/osrm-backend
+    container_name: latacunga_routing
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mapea la carpeta local osrm-data al contenedor
+      - ./osrm-data:/data
+    # Usa el algoritmo MLD (Multi-Level Dijkstra) para rutas rápidas
+    command: "osrm-routed --algorithm mld /data/ecuador-latest.osrm"
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/trip/v1/driving/-78.614,-0.933;-78.612,-0.935?source=first"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # 🗄️ Base de Datos PostgreSQL + PostGIS (si necesitas local)
+  # postgres:
+  #   image: postgis/postgis:15-3.3
+  #   container_name: latacunga_postgres
+  #   restart: always
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: latacunga_clean
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   networks:
+  #     - latacunga-network
+
+  # 📬 RabbitMQ (si necesitas mensajería)
+  # rabbitmq:
+  #   image: rabbitmq:3-management
+  #   container_name: latacunga_rabbitmq
+  #   restart: always
+  #   ports:
+  #     - "5672:5672"   # Puerto AMQP
+  #     - "15672:15672" # Management UI
+  #   environment:
+  #     RABBITMQ_DEFAULT_USER: admin
+  #     RABBITMQ_DEFAULT_PASS: admin
+  #   networks:
+  #     - latacunga-network
+
+networks:
+  latacunga-network:
+    driver: bridge
+
+# volumes:
+#   postgres-data:

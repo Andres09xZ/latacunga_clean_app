@@ -1,44 +1,7 @@
+//go:build ignore
 package handlers
 
-import (
-	"net/http"
-	"strconv"
-
-	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/models"
-	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/repository"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-)
-
-// ZoneHandler maneja las solicitudes HTTP relacionadas con zonas
-type ZoneHandler struct {
-	zoneRepo *repository.ZoneRepository
-}
-
-// NewZoneHandler crea una nueva instancia del handler
-func NewZoneHandler(db *gorm.DB) *ZoneHandler {
-	return &ZoneHandler{
-		zoneRepo: repository.NewZoneRepository(db),
-	}
-}
-
-// GetAllZones godoc
-// @Summary Lista todas las zonas de recolección
-// @Description Retorna todas las zonas geográficas de recolección
-// @Tags zones
-// @Accept json
-// @Produce json
-// @Success 200 {array} models.CleaningZone
-// @Failure 500 {object} map[string]string
-// @Router /api/zones [get]
-func (h *ZoneHandler) GetAllZones(c *gin.Context) {
-	zones, err := h.zoneRepo.FindAll()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error al obtener zonas"})
-		return
-	}
-
-	c.JSON(http.StatusOK, zones)
+/* Legacy zone handler removed; replaced by PlanningHandler endpoints.
 }
 
 // GetZoneByID godoc
@@ -173,8 +136,9 @@ func (h *ZoneHandler) SearchZoneByPoint(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, result)
+    c.JSON(http.StatusOK, result)
 }
+*/
 
 // GetNearestZone godoc
 // @Summary Busca zona más cercana
@@ -276,3 +240,4 @@ func (h *ZoneHandler) GetZonesGeoJSON(c *gin.Context) {
 	c.Header("Content-Type", "application/geo+json")
 	c.String(http.StatusOK, geojson)
 }
+*/

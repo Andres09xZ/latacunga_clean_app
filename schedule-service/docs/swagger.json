@@ -1,12 +1,29 @@
 {
+    "schemes": [
+        "http",
+        "https"
+    ],
     "swagger": "2.0",
     "info": {
-        "contact": {}
+        "description": "API de planificación para recolección de residuos de Latacunga. Geolocaliza incidentes, acumula puntaje y dispara eventos de recolección.",
+        "title": "Schedule Service - Planning Core API",
+        "termsOfService": "http://latacunga.gob.ec/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "soporte@latacunga.gob.ec"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
     },
+    "host": "localhost:8083",
+    "basePath": "/",
     "paths": {
-        "/api/v1/schedule/{date}": {
-            "get": {
-                "description": "Get all tasks scheduled for a specific date",
+        "/api/v1/planning/config/thresholds": {
+            "put": {
+                "description": "Permite configurar dinámicamente los umbrales que activan la recolección automática",
                 "consumes": [
                     "application/json"
                 ],
@@ -14,27 +31,35 @@
                     "application/json"
                 ],
                 "tags": [
-                    "schedule"
+                    "Planning"
                 ],
-                "summary": "Get daily schedule",
+                "summary": "Actualiza umbrales de disparo por zona",
                 "parameters": [
                     {
-                        "type": "string",
-                        "description": "Date (YYYY-MM-DD)",
-                        "name": "date",
-                        "in": "path",
-                        "required": true
+                        "description": "Mapa de zona a umbral (ej: {\\",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Cantidad de umbrales actualizados",
                         "schema": {
-                            "$ref": "#/definitions/models.DailyScheduleResponse"
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "JSON inválido o umbral negativo",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -45,50 +70,9 @@
                 }
             }
         },
-        "/api/v1/shifts": {
-            "get": {
-                "description": "Get all shifts, optionally filtered by date",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "shifts"
-                ],
-                "summary": "List all shifts",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Filter by date (YYYY-MM-DD)",
-                        "name": "date",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ShiftResponse"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/v1/planning/simulate": {
             "post": {
-                "description": "Create a new shift in the schedule",
+                "description": "Inyecta un incidente falso con coordenadas para verificar detección de zona y acumulación de puntaje",
                 "consumes": [
                     "application/json"
                 ],
@@ -96,29 +80,35 @@
                     "application/json"
                 ],
                 "tags": [
-                    "shifts"
+                    "Planning"
                 ],
-                "summary": "Create a new shift",
+                "summary": "Simula un incidente para debugging",
                 "parameters": [
                     {
-                        "description": "Shift details",
-                        "name": "request",
+                        "description": "Datos del incidente simulado",
+                        "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.CreateShiftRequest"
+                            "$ref": "#/definitions/models.SimulateIncidentRequest"
                         }
                     }
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created",
+                        "description": "Umbral superado, recolección activada automáticamente",
                         "schema": {
-                            "$ref": "#/definitions/models.ShiftResponse"
+                            "$ref": "#/definitions/models.PlanningResult"
+                        }
+                    },
+                    "202": {
+                        "description": "Incidente procesado, zona detectada, puntaje acumulado (umbral no superado)",
+                        "schema": {
+                            "$ref": "#/definitions/models.PlanningResult"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Coordenadas inválidas o zona no encontrada",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -129,204 +119,28 @@
                 }
             }
         },
-        "/api/v1/shifts/{id}": {
+        "/api/v1/planning/zones": {
             "get": {
-                "description": "Get details of a specific shift",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Obtiene todas las zonas macro de planificación con su geometría y configuración de horario",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "shifts"
-                ],
-                "summary": "Get a shift by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Shift ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ShiftResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "put": {
-                "description": "Update shift details",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "shifts"
-                ],
-                "summary": "Update a shift",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Shift ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Updated shift details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/models.CreateShiftRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ShiftResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "Delete a shift by ID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "shifts"
-                ],
-                "summary": "Delete a shift",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Shift ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/tasks/{id}/assign": {
-            "post": {
-                "description": "Manually assign a task to a specific shift",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "schedule"
-                ],
-                "summary": "Assign task to shift",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Task ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Shift ID",
-                        "name": "shift_id",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ScheduleTaskResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones": {
-            "get": {
-                "description": "Retorna todas las zonas geográficas de recolección",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
+                    "Planning"
                 ],
                 "summary": "Lista todas las zonas de recolección",
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Lista de zonas",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/models.CleaningZone"
+                                "type": "object"
                             }
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Error interno del servidor",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -337,255 +151,35 @@
                 }
             }
         },
-        "/api/zones/day/{day}": {
+        "/api/v1/planning/zones/{id}/metrics": {
             "get": {
-                "description": "Retorna todas las zonas de un día específico (0=Dom, 1=Lun, ..., 6=Sáb)",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "Retorna el puntaje actual y umbral configurado para una zona específica",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "zones"
+                    "Planning"
                 ],
-                "summary": "Lista zonas por día",
+                "summary": "Obtiene métricas de acumulación de una zona",
                 "parameters": [
                     {
                         "type": "integer",
-                        "example": 1,
-                        "description": "Day of Week",
-                        "name": "day",
+                        "description": "ID de la zona",
+                        "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.CleaningZone"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/geojson": {
-            "get": {
-                "description": "Retorna todas las zonas en formato GeoJSON FeatureCollection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Exporta zonas como GeoJSON",
-                "responses": {
-                    "200": {
-                        "description": "OK",
+                        "description": "Métricas de la zona",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/nearest": {
-            "get": {
-                "description": "Encuentra la zona más cercana a un punto geográfico (aunque no lo contenga)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Busca zona más cercana",
-                "parameters": [
-                    {
-                        "type": "number",
-                        "example": -0.933,
-                        "description": "Latitude",
-                        "name": "lat",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "number",
-                        "example": -78.614,
-                        "description": "Longitude",
-                        "name": "lon",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ZoneSearchResult"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/route/{route_name}": {
-            "get": {
-                "description": "Retorna todas las zonas de una ruta específica",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Lista zonas por ruta",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "RUTA_1",
-                        "description": "Route Name",
-                        "name": "route_name",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.CleaningZone"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/search": {
-            "get": {
-                "description": "Encuentra la zona que contiene un punto geográfico específico",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Busca zona por coordenadas",
-                "parameters": [
-                    {
-                        "type": "number",
-                        "example": -0.933,
-                        "description": "Latitude",
-                        "name": "lat",
-                        "in": "query",
-                        "required": true
-                    },
-                    {
-                        "type": "number",
-                        "example": -78.614,
-                        "description": "Longitude",
-                        "name": "lon",
-                        "in": "query",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/models.ZoneSearchResult"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
                     "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
+                        "description": "Zona o métricas no encontradas",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -596,9 +190,9 @@
                 }
             }
         },
-        "/api/zones/summary/days": {
-            "get": {
-                "description": "Retorna estadísticas agrupadas por día de la semana",
+        "/api/v1/planning/zones/{id}/trigger": {
+            "post": {
+                "description": "Fuerza un trigger de recolección ignorando el puntaje acumulado, útil para emergencias",
                 "consumes": [
                     "application/json"
                 ],
@@ -606,97 +200,36 @@
                     "application/json"
                 ],
                 "tags": [
-                    "zones"
+                    "Planning"
                 ],
-                "summary": "Resumen de zonas por día",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ZonesByDay"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/summary/routes": {
-            "get": {
-                "description": "Retorna estadísticas agrupadas por ruta",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Resumen de zonas por ruta",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/models.ZonesByRoute"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/zones/{id}": {
-            "get": {
-                "description": "Retorna los detalles de una zona específica",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "zones"
-                ],
-                "summary": "Obtiene una zona por ID",
+                "summary": "Dispara manualmente la recolección para una zona",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Zone ID",
+                        "description": "ID de la zona",
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Razón del trigger manual (ej: {\\",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "object"
+                        }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Resultado del trigger",
                         "schema": {
-                            "$ref": "#/definitions/models.CleaningZone"
+                            "type": "object"
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
+                    "400": {
+                        "description": "JSON inválido",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
@@ -705,12 +238,64 @@
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Error interno",
                         "schema": {
                             "type": "object",
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Verifica la salud de RabbitMQ y otros componentes del sistema",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Verifica la salud de todos los servicios",
+                "responses": {
+                    "200": {
+                        "description": "Todos los servicios están saludables",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Uno o más servicios no están disponibles",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health/rabbitmq": {
+            "get": {
+                "description": "Verifica la conexión y estado de RabbitMQ",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Verifica la salud de RabbitMQ",
+                "responses": {
+                    "200": {
+                        "description": "RabbitMQ está saludable",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "RabbitMQ no está disponible",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.HealthResponse"
                         }
                     }
                 }
@@ -718,162 +303,57 @@
         }
     },
     "definitions": {
-        "models.CleaningZone": {
+        "handlers.HealthResponse": {
             "type": "object",
             "properties": {
-                "area_km2": {
-                    "type": "number"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "geojson": {
-                    "description": "Campo virtual para respuestas API",
-                    "type": "string"
-                },
-                "id": {
-                    "type": "integer"
-                },
-                "points_count": {
-                    "type": "integer"
-                },
-                "route_name": {
-                    "type": "string"
-                },
-                "schedule_day": {
-                    "description": "0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb",
-                    "type": "integer"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "zone_name": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.CreateShiftRequest": {
-            "type": "object",
-            "required": [
-                "date",
-                "end_time",
-                "max_tasks",
-                "start_time"
-            ],
-            "properties": {
-                "date": {
-                    "type": "string"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "max_tasks": {
-                    "type": "integer",
-                    "minimum": 1
-                },
-                "start_time": {
-                    "type": "string"
-                }
-            }
-        },
-        "models.DailyScheduleResponse": {
-            "type": "object",
-            "properties": {
-                "date": {
-                    "type": "string"
-                },
-                "shifts": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.ShiftResponse"
+                "services": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/handlers.ServiceInfo"
                     }
-                },
-                "tasks": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/models.ScheduleTaskResponse"
-                    }
-                }
-            }
-        },
-        "models.ScheduleTaskResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "date": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "latitude": {
-                    "type": "number"
-                },
-                "location": {
-                    "type": "string"
-                },
-                "longitude": {
-                    "type": "number"
-                },
-                "priority": {
-                    "type": "string"
-                },
-                "shift_id": {
-                    "type": "string"
                 },
                 "status": {
                     "type": "string"
                 },
-                "task_id": {
-                    "type": "string"
-                },
-                "task_type": {
+                "timestamp": {
                     "type": "string"
                 }
             }
         },
-        "models.ShiftResponse": {
+        "handlers.ServiceInfo": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "date": {
-                    "type": "string"
-                },
-                "end_time": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "max_tasks": {
-                    "type": "integer"
-                },
-                "start_time": {
+                "message": {
                     "type": "string"
                 },
                 "status": {
                     "type": "string"
-                },
-                "task_count": {
-                    "type": "integer"
                 }
             }
         },
-        "models.ZoneSearchResult": {
+        "models.PlanningResult": {
             "type": "object",
             "properties": {
-                "day_name": {
+                "reason": {
                     "type": "string"
                 },
-                "distance_meters": {
-                    "type": "number"
-                },
-                "route_name": {
+                "scheduled_label": {
                     "type": "string"
+                },
+                "scheduled_time": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "threshold": {
+                    "type": "integer"
+                },
+                "triggered": {
+                    "type": "boolean"
                 },
                 "zone_id": {
                     "type": "integer"
@@ -883,43 +363,27 @@
                 }
             }
         },
-        "models.ZonesByDay": {
+        "models.SimulateIncidentRequest": {
             "type": "object",
+            "required": [
+                "lat",
+                "lon",
+                "type"
+            ],
             "properties": {
-                "day_name": {
-                    "type": "string"
+                "lat": {
+                    "description": "Centro de URBANO_CENTRAL",
+                    "type": "number",
+                    "example": -0.935
                 },
-                "routes": {
-                    "type": "string"
+                "lon": {
+                    "description": "Centro de URBANO_CENTRAL",
+                    "type": "number",
+                    "example": -78.6175
                 },
-                "schedule_day": {
-                    "type": "integer"
-                },
-                "total_area_km2": {
-                    "type": "number"
-                },
-                "total_zones": {
-                    "type": "integer"
-                }
-            }
-        },
-        "models.ZonesByRoute": {
-            "type": "object",
-            "properties": {
-                "avg_points_per_zone": {
-                    "type": "number"
-                },
-                "route_name": {
-                    "type": "string"
-                },
-                "total_area_km2": {
-                    "type": "number"
-                },
-                "total_zones": {
-                    "type": "integer"
-                },
-                "zones": {
-                    "type": "string"
+                "type": {
+                    "type": "string",
+                    "example": "SENSOR_LLENO"
                 }
             }
         }

@@ -1,16 +1,29 @@
+// @title Schedule Service - Planning Core API
+// @version 1.0
+// @description API de planificación para recolección de residuos de Latacunga. Geolocaliza incidentes, acumula puntaje y dispara eventos de recolección.
+// @termsOfService http://latacunga.gob.ec/terms/
+
+// @contact.name API Support
+// @contact.email soporte@latacunga.gob.ec
+
+// @license.name Apache 2.0
+// @license.url http://www.apache.org/licenses/LICENSE-2.0.html
+
+// @host localhost:8083
+// @BasePath /
+// @schemes http https
+
 package main
 
 import (
 	"log"
 	"os"
 
-	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/docs"
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/database"
-	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/messaging"
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/server"
 	"github.com/joho/godotenv"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "github.com/Andres09xZ/latacunga_clean_app/schedule-service/docs"
 )
 
 func main() {
@@ -40,16 +53,6 @@ func main() {
 		log.Fatal("❌ DB_URL environment variable is required")
 	}
 
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		log.Fatal("❌ JWT_SECRET environment variable is required")
-	}
-
-	rabbitmqURL := os.Getenv("RABBITMQ_URL")
-	if rabbitmqURL == "" {
-		rabbitmqURL = "amqp://guest:guest@localhost:5672/"
-	}
-
 	// Connect to database
 	log.Println("🔌 Connecting to database...")
 	db, err := database.Connect(dbURL)
@@ -63,36 +66,15 @@ func main() {
 		log.Fatalf("❌ Failed to run migrations: %v", err)
 	}
 
-	// Initialize RabbitMQ
-	log.Println("🐰 Initializing RabbitMQ...")
-	if err := messaging.InitRabbitMQ(rabbitmqURL); err != nil {
-		log.Printf("⚠️  Warning: Failed to initialize RabbitMQ: %v (Service will run without event consumer)", err)
-		// Continue anyway - service can still work without RabbitMQ
-	} else {
-		defer messaging.CloseRabbitMQ()
-	}
-
 	// Create server
 	srv := server.NewServer(port, db)
 	defer srv.Close()
-
-	// Setup Swagger
-	docs.SwaggerInfo.BasePath = "/"
-	docs.SwaggerInfo.Host = "localhost:8083"
-
-	// Setup routes
-	if err := srv.Setup(jwtSecret); err != nil {
+	if err := srv.Setup(); err != nil {
 		log.Fatalf("❌ Failed to setup server: %v", err)
 	}
 
-	// Setup Swagger endpoint
-	srv.Router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	// Start event consumer
-	srv.StartEventConsumer()
-
 	// Start server
-	log.Printf("✅ Schedule service starting on port %s\n", port)
+	log.Printf("✅ Planning Core service starting on port %s\n", port)
 	if err := srv.Start(); err != nil {
 		log.Fatalf("❌ Server error: %v", err)
 	}

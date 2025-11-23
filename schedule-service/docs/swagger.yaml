@@ -1,370 +1,170 @@
+basePath: /
 definitions:
-  models.CleaningZone:
+  handlers.HealthResponse:
     properties:
-      area_km2:
-        type: number
-      created_at:
+      services:
+        additionalProperties:
+          $ref: '#/definitions/handlers.ServiceInfo'
+        type: object
+      status:
         type: string
-      geojson:
-        description: Campo virtual para respuestas API
-        type: string
-      id:
-        type: integer
-      points_count:
-        type: integer
-      route_name:
-        type: string
-      schedule_day:
-        description: 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
-        type: integer
-      updated_at:
-        type: string
-      zone_name:
+      timestamp:
         type: string
     type: object
-  models.CreateShiftRequest:
+  handlers.ServiceInfo:
     properties:
-      date:
-        type: string
-      end_time:
-        type: string
-      max_tasks:
-        minimum: 1
-        type: integer
-      start_time:
-        type: string
-    required:
-    - date
-    - end_time
-    - max_tasks
-    - start_time
-    type: object
-  models.DailyScheduleResponse:
-    properties:
-      date:
-        type: string
-      shifts:
-        items:
-          $ref: '#/definitions/models.ShiftResponse'
-        type: array
-      tasks:
-        items:
-          $ref: '#/definitions/models.ScheduleTaskResponse'
-        type: array
-    type: object
-  models.ScheduleTaskResponse:
-    properties:
-      created_at:
-        type: string
-      date:
-        type: string
-      id:
-        type: string
-      latitude:
-        type: number
-      location:
-        type: string
-      longitude:
-        type: number
-      priority:
-        type: string
-      shift_id:
+      message:
         type: string
       status:
         type: string
-      task_id:
-        type: string
-      task_type:
-        type: string
     type: object
-  models.ShiftResponse:
+  models.PlanningResult:
     properties:
-      created_at:
+      reason:
         type: string
-      date:
+      scheduled_label:
         type: string
-      end_time:
+      scheduled_time:
         type: string
-      id:
-        type: string
-      max_tasks:
+      score:
         type: integer
-      start_time:
-        type: string
       status:
         type: string
-      task_count:
+      threshold:
         type: integer
-    type: object
-  models.ZoneSearchResult:
-    properties:
-      day_name:
-        type: string
-      distance_meters:
-        type: number
-      route_name:
-        type: string
+      triggered:
+        type: boolean
       zone_id:
         type: integer
       zone_name:
         type: string
     type: object
-  models.ZonesByDay:
+  models.SimulateIncidentRequest:
     properties:
-      day_name:
-        type: string
-      routes:
-        type: string
-      schedule_day:
-        type: integer
-      total_area_km2:
+      lat:
+        description: Centro de URBANO_CENTRAL
+        example: -0.935
         type: number
-      total_zones:
-        type: integer
+      lon:
+        description: Centro de URBANO_CENTRAL
+        example: -78.6175
+        type: number
+      type:
+        example: SENSOR_LLENO
+        type: string
+    required:
+    - lat
+    - lon
+    - type
     type: object
-  models.ZonesByRoute:
-    properties:
-      avg_points_per_zone:
-        type: number
-      route_name:
-        type: string
-      total_area_km2:
-        type: number
-      total_zones:
-        type: integer
-      zones:
-        type: string
-    type: object
+host: localhost:8083
 info:
-  contact: {}
+  contact:
+    email: soporte@latacunga.gob.ec
+    name: API Support
+  description: API de planificación para recolección de residuos de Latacunga. Geolocaliza
+    incidentes, acumula puntaje y dispara eventos de recolección.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://latacunga.gob.ec/terms/
+  title: Schedule Service - Planning Core API
+  version: "1.0"
 paths:
-  /api/v1/schedule/{date}:
-    get:
+  /api/v1/planning/config/thresholds:
+    put:
       consumes:
       - application/json
-      description: Get all tasks scheduled for a specific date
+      description: Permite configurar dinámicamente los umbrales que activan la recolección
+        automática
       parameters:
-      - description: Date (YYYY-MM-DD)
-        in: path
-        name: date
+      - description: 'Mapa de zona a umbral (ej: {\'
+        in: body
+        name: body
         required: true
-        type: string
+        schema:
+          additionalProperties:
+            type: integer
+          type: object
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Cantidad de umbrales actualizados
           schema:
-            $ref: '#/definitions/models.DailyScheduleResponse'
+            additionalProperties:
+              type: integer
+            type: object
         "400":
-          description: Bad Request
+          description: JSON inválido o umbral negativo
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Get daily schedule
+      summary: Actualiza umbrales de disparo por zona
       tags:
-      - schedule
-  /api/v1/shifts:
-    get:
-      consumes:
-      - application/json
-      description: Get all shifts, optionally filtered by date
-      parameters:
-      - description: Filter by date (YYYY-MM-DD)
-        in: query
-        name: date
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.ShiftResponse'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: List all shifts
-      tags:
-      - shifts
+      - Planning
+  /api/v1/planning/simulate:
     post:
       consumes:
       - application/json
-      description: Create a new shift in the schedule
+      description: Inyecta un incidente falso con coordenadas para verificar detección
+        de zona y acumulación de puntaje
       parameters:
-      - description: Shift details
+      - description: Datos del incidente simulado
         in: body
-        name: request
+        name: body
         required: true
         schema:
-          $ref: '#/definitions/models.CreateShiftRequest'
+          $ref: '#/definitions/models.SimulateIncidentRequest'
       produces:
       - application/json
       responses:
         "201":
-          description: Created
+          description: Umbral superado, recolección activada automáticamente
           schema:
-            $ref: '#/definitions/models.ShiftResponse'
+            $ref: '#/definitions/models.PlanningResult'
+        "202":
+          description: Incidente procesado, zona detectada, puntaje acumulado (umbral
+            no superado)
+          schema:
+            $ref: '#/definitions/models.PlanningResult'
         "400":
-          description: Bad Request
+          description: Coordenadas inválidas o zona no encontrada
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Create a new shift
+      summary: Simula un incidente para debugging
       tags:
-      - shifts
-  /api/v1/shifts/{id}:
-    delete:
-      consumes:
-      - application/json
-      description: Delete a shift by ID
-      parameters:
-      - description: Shift ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Delete a shift
-      tags:
-      - shifts
+      - Planning
+  /api/v1/planning/zones:
     get:
-      consumes:
-      - application/json
-      description: Get details of a specific shift
-      parameters:
-      - description: Shift ID
-        in: path
-        name: id
-        required: true
-        type: string
+      description: Obtiene todas las zonas macro de planificación con su geometría
+        y configuración de horario
       produces:
       - application/json
       responses:
         "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ShiftResponse'
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Get a shift by ID
-      tags:
-      - shifts
-    put:
-      consumes:
-      - application/json
-      description: Update shift details
-      parameters:
-      - description: Shift ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Updated shift details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/models.CreateShiftRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ShiftResponse'
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Update a shift
-      tags:
-      - shifts
-  /api/v1/tasks/{id}/assign:
-    post:
-      consumes:
-      - application/json
-      description: Manually assign a task to a specific shift
-      parameters:
-      - description: Task ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Shift ID
-        in: query
-        name: shift_id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ScheduleTaskResponse'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Assign task to shift
-      tags:
-      - schedule
-  /api/zones:
-    get:
-      consumes:
-      - application/json
-      description: Retorna todas las zonas geográficas de recolección
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+          description: Lista de zonas
           schema:
             items:
-              $ref: '#/definitions/models.CleaningZone'
+              type: object
             type: array
         "500":
-          description: Internal Server Error
+          description: Error interno del servidor
           schema:
             additionalProperties:
               type: string
             type: object
       summary: Lista todas las zonas de recolección
       tags:
-      - zones
-  /api/zones/{id}:
+      - Planning
+  /api/v1/planning/zones/{id}/metrics:
     get:
-      consumes:
-      - application/json
-      description: Retorna los detalles de una zona específica
+      description: Retorna el puntaje actual y umbral configurado para una zona específica
       parameters:
-      - description: Zone ID
+      - description: ID de la zona
         in: path
         name: id
         required: true
@@ -373,244 +173,94 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.CleaningZone'
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Obtiene una zona por ID
-      tags:
-      - zones
-  /api/zones/day/{day}:
-    get:
-      consumes:
-      - application/json
-      description: Retorna todas las zonas de un día específico (0=Dom, 1=Lun, ...,
-        6=Sáb)
-      parameters:
-      - description: Day of Week
-        example: 1
-        in: path
-        name: day
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.CleaningZone'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Lista zonas por día
-      tags:
-      - zones
-  /api/zones/geojson:
-    get:
-      consumes:
-      - application/json
-      description: Retorna todas las zonas en formato GeoJSON FeatureCollection
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+          description: Métricas de la zona
           schema:
             additionalProperties: true
             type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Exporta zonas como GeoJSON
-      tags:
-      - zones
-  /api/zones/nearest:
-    get:
-      consumes:
-      - application/json
-      description: Encuentra la zona más cercana a un punto geográfico (aunque no
-        lo contenga)
-      parameters:
-      - description: Latitude
-        example: -0.933
-        in: query
-        name: lat
-        required: true
-        type: number
-      - description: Longitude
-        example: -78.614
-        in: query
-        name: lon
-        required: true
-        type: number
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ZoneSearchResult'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Busca zona más cercana
-      tags:
-      - zones
-  /api/zones/route/{route_name}:
-    get:
-      consumes:
-      - application/json
-      description: Retorna todas las zonas de una ruta específica
-      parameters:
-      - description: Route Name
-        example: RUTA_1
-        in: path
-        name: route_name
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/models.CleaningZone'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Lista zonas por ruta
-      tags:
-      - zones
-  /api/zones/search:
-    get:
-      consumes:
-      - application/json
-      description: Encuentra la zona que contiene un punto geográfico específico
-      parameters:
-      - description: Latitude
-        example: -0.933
-        in: query
-        name: lat
-        required: true
-        type: number
-      - description: Longitude
-        example: -78.614
-        in: query
-        name: lon
-        required: true
-        type: number
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/models.ZoneSearchResult'
-        "400":
-          description: Bad Request
-          schema:
-            additionalProperties:
-              type: string
-            type: object
         "404":
-          description: Not Found
+          description: Zona o métricas no encontradas
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Obtiene métricas de acumulación de una zona
+      tags:
+      - Planning
+  /api/v1/planning/zones/{id}/trigger:
+    post:
+      consumes:
+      - application/json
+      description: Fuerza un trigger de recolección ignorando el puntaje acumulado,
+        útil para emergencias
+      parameters:
+      - description: ID de la zona
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 'Razón del trigger manual (ej: {\'
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Resultado del trigger
+          schema:
+            type: object
+        "400":
+          description: JSON inválido
           schema:
             additionalProperties:
               type: string
             type: object
         "500":
-          description: Internal Server Error
+          description: Error interno
           schema:
             additionalProperties:
               type: string
             type: object
-      summary: Busca zona por coordenadas
+      summary: Dispara manualmente la recolección para una zona
       tags:
-      - zones
-  /api/zones/summary/days:
+      - Planning
+  /health:
     get:
-      consumes:
-      - application/json
-      description: Retorna estadísticas agrupadas por día de la semana
+      description: Verifica la salud de RabbitMQ y otros componentes del sistema
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: Todos los servicios están saludables
           schema:
-            items:
-              $ref: '#/definitions/models.ZonesByDay'
-            type: array
-        "500":
-          description: Internal Server Error
+            $ref: '#/definitions/handlers.HealthResponse'
+        "503":
+          description: Uno o más servicios no están disponibles
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Resumen de zonas por día
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Verifica la salud de todos los servicios
       tags:
-      - zones
-  /api/zones/summary/routes:
+      - Health
+  /health/rabbitmq:
     get:
-      consumes:
-      - application/json
-      description: Retorna estadísticas agrupadas por ruta
+      description: Verifica la conexión y estado de RabbitMQ
       produces:
       - application/json
       responses:
         "200":
-          description: OK
+          description: RabbitMQ está saludable
           schema:
-            items:
-              $ref: '#/definitions/models.ZonesByRoute'
-            type: array
-        "500":
-          description: Internal Server Error
+            $ref: '#/definitions/handlers.HealthResponse'
+        "503":
+          description: RabbitMQ no está disponible
           schema:
-            additionalProperties:
-              type: string
-            type: object
-      summary: Resumen de zonas por ruta
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Verifica la salud de RabbitMQ
       tags:
-      - zones
+      - Health
+schemes:
+- http
+- https
 swagger: "2.0"

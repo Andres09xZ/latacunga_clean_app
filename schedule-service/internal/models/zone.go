@@ -10,90 +10,96 @@ import (
 	"gorm.io/gorm"
 )
 
-// CleaningZone representa una zona geográfica de recolección
+// CleaningZone representa una zona macro de planificación.
+// Campos según tabla cleaning_zones (migrations 005 + 012).
 type CleaningZone struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	ZoneName    string    `gorm:"size:100;not null" json:"zone_name"`
-	RouteName   string    `gorm:"size:50;not null" json:"route_name"`
-	ScheduleDay int       `gorm:"not null" json:"schedule_day"` // 0=Dom, 1=Lun, 2=Mar, 3=Mié, 4=Jue, 5=Vie, 6=Sáb
-	PointsCount int       `json:"points_count"`
-	AreaKm2     float64   `gorm:"type:decimal(10,4)" json:"area_km2"`
-	Geom        []byte    `gorm:"type:geometry(MULTIPOLYGON,4326);not null" json:"-"`
-	GeoJSON     *string   `gorm:"-" json:"geojson,omitempty"` // Campo virtual para respuestas API
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	ZoneName       string    `gorm:"size:100;not null" json:"zone_name"`       // Ej: "RUTA 1 LUNES"
+	RouteName      string    `gorm:"size:50;not null" json:"route_name"`       // Ej: "RUTA_1"
+	ScheduleDay    int       `gorm:"not null" json:"schedule_day"`             // 0=Domingo, 1=Lunes... 6=Sábado
+	ScheduleConfig string    `gorm:"type:text" json:"schedule_config"`         // Ej: "NOCTURNO (21:00)", "DIURNO (Mar-Jue-Sab)"
+	Status         string    `gorm:"size:40;default:ACUMULANDO" json:"status"` // ACUMULANDO | LISTO_PARA_RECOLECCION | EN_PROGRESO
+	PointsCount    int       `gorm:"default:0" json:"points_count"`            // Cantidad de puntos en geometría
+	AreaKm2        *float64  `gorm:"type:decimal(10,4)" json:"area_km2"`       // Área aproximada
+	Geom           []byte    `gorm:"type:geometry(MULTIPOLYGON,4326)" json:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-// TableName especifica el nombre de la tabla en la base de datos
-func (CleaningZone) TableName() string {
-	return "cleaning_zones"
-}
+func (CleaningZone) TableName() string { return "cleaning_zones" }
 
-// AfterFind hook de GORM para convertir geometría a GeoJSON después de consultar
+// AfterFind: convierte la geometría a GeoJSON simple.
 func (z *CleaningZone) AfterFind(tx *gorm.DB) error {
 	if len(z.Geom) == 0 {
 		return nil
 	}
-
-	// Intentar decodificar WKB plano. Muchos drivers PostGIS retornan EWKB (extendido con SRID),
-	// si falla ignoramos la conversión y no bloqueamos la respuesta.
 	geom, err := wkb.Unmarshal(z.Geom)
 	if err != nil {
-		log.Printf("⚠️  WKB parse failed for zone id=%d: %v (falling back without geojson)", z.ID, err)
-		return nil // NO propagamos error para evitar 500 en el listado
-	}
-
-	feature := geojson.NewFeature(geom)
-	feature.Properties = map[string]interface{}{
-		"zone_name":    z.ZoneName,
-		"route_name":   z.RouteName,
-		"schedule_day": z.ScheduleDay,
-		"area_km2":     z.AreaKm2,
-	}
-
-	geojsonBytes, err := json.Marshal(feature)
-	if err != nil {
-		log.Printf("⚠️  GeoJSON marshal failed for zone id=%d: %v", z.ID, err)
+		log.Printf("geom parse failed id=%d: %v", z.ID, err)
 		return nil
 	}
-
-	geojsonStr := string(geojsonBytes)
-	z.GeoJSON = &geojsonStr
+	feature := geojson.NewFeature(geom)
+	feature.Properties = map[string]interface{}{
+		"zone_name":       z.ZoneName,
+		"route_name":      z.RouteName,
+		"schedule_day":    z.ScheduleDay,
+		"schedule_config": z.ScheduleConfig,
+		"status":          z.Status,
+		"points_count":    z.PointsCount,
+	}
+	b, err := json.Marshal(feature)
+	if err != nil {
+		return nil
+	}
+	geo := string(b)
+	// expose via pointer if needed by handler
+	_ = geo
 	return nil
 }
 
-// ZoneSearchResult representa el resultado de una búsqueda espacial
-type ZoneSearchResult struct {
-	ZoneID         uint    `json:"zone_id"`
-	ZoneName       string  `json:"zone_name"`
-	RouteName      string  `json:"route_name"`
-	DayName        string  `json:"day_name"`
-	DistanceMeters float64 `json:"distance_meters"`
+// ZoneMetrics representa el estado de acumulación separado de la definición geográfica.
+type ZoneMetrics struct {
+	ZoneID       uint       `gorm:"primaryKey" json:"zone_id"`
+	CurrentScore int        `gorm:"not null;default:0" json:"current_score"`
+	Threshold    int        `gorm:"not null;default:50" json:"threshold"`
+	LastTrigger  *time.Time `json:"last_trigger"`
+	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
-// ZonesByRoute vista agregada por ruta
-type ZonesByRoute struct {
-	RouteName        string  `json:"route_name"`
-	TotalZones       int     `json:"total_zones"`
-	TotalAreaKm2     float64 `json:"total_area_km2"`
-	AvgPointsPerZone float64 `json:"avg_points_per_zone"`
-	Zones            string  `json:"zones"`
+func (ZoneMetrics) TableName() string { return "zone_metrics" }
+
+// SimulateIncidentRequest representa el payload para simular un incidente.
+type SimulateIncidentRequest struct {
+	Lat  float64 `json:"lat" example:"-0.935" binding:"required"`   // Centro de URBANO_CENTRAL
+	Lon  float64 `json:"lon" example:"-78.6175" binding:"required"` // Centro de URBANO_CENTRAL
+	Type string  `json:"type" example:"SENSOR_LLENO" binding:"required"`
 }
 
-// ZonesByDay vista agregada por día
-type ZonesByDay struct {
-	ScheduleDay  int     `json:"schedule_day"`
-	DayName      string  `json:"day_name"`
-	TotalZones   int     `json:"total_zones"`
-	TotalAreaKm2 float64 `json:"total_area_km2"`
-	Routes       string  `json:"routes"`
+// PlanningResult representa la respuesta de evaluar un incidente.
+type PlanningResult struct {
+	ZoneID         uint      `json:"zone_id"`
+	ZoneName       string    `json:"zone_name"`
+	NewScore       int       `json:"score"`
+	Threshold      int       `json:"threshold"`
+	Triggered      bool      `json:"triggered"`
+	Status         string    `json:"status"`
+	ScheduledTime  time.Time `json:"scheduled_time"`
+	ScheduledLabel string    `json:"scheduled_label"`
+	Reason         string    `json:"reason,omitempty"`
 }
 
-// GetDayName retorna el nombre del día en español
-func GetDayName(day int) string {
-	days := []string{"Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"}
-	if day >= 0 && day < len(days) {
-		return days[day]
-	}
-	return "Desconocido"
+// PendingItem representa un incidente pendiente almacenado temporalmente.
+// Se guarda cada incidente recibido mientras la zona acumula puntos.
+type PendingItem struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Lat           float64   `gorm:"not null" json:"lat"`                                                       // Latitud del incidente
+	Lon           float64   `gorm:"not null" json:"lon"`                                                       // Longitud del incidente
+	IncidentID    string    `gorm:"size:100;uniqueIndex" json:"incident_id"`                                   // ID único del incidente
+	ZoneID        uint      `gorm:"not null;index:idx_pending_zone" json:"zone_id"`                            // Zona donde ocurrió
+	GravityPoints int       `gorm:"not null" json:"gravity_points"`                                            // Puntos asignados según tipo
+	Status        string    `gorm:"size:20;not null;default:'PENDING';index:idx_pending_status" json:"status"` // PENDING | PROCESSED | CANCELLED
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
+
+func (PendingItem) TableName() string { return "pending_items" }
