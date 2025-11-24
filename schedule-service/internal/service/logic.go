@@ -96,7 +96,20 @@ func (tl *TriggerLogic) EvaluateAndTrigger(zoneID int, newScore int, threshold i
 	log.Printf("📦 Cosechados %d puntos pendientes de zona %d", len(pendingItems), zoneID)
 
 	// 2. Construir payload con los puntos
-	points := make([]GeoPoint, 0, len(pendingItems))
+	// IMPORTANTE: Insertar punto de partida fijo (EPAGAL) al inicio
+	points := make([]GeoPoint, 0, len(pendingItems)+1)
+
+	// Insertar EPAGAL como primer punto (DEPOT_START)
+	depotPoint := GeoPoint{
+		Lat:           -0.9364043,
+		Lon:           -78.6087099,
+		IncidentID:    "DEPOT_START",
+		GravityPoints: 0, // El depósito no tiene puntaje
+	}
+	points = append(points, depotPoint)
+	log.Printf("🏢 Punto de partida agregado: EPAGAL (Lat: %.7f, Lon: %.7f)", depotPoint.Lat, depotPoint.Lon)
+
+	// Agregar los puntos de incidentes
 	for _, item := range pendingItems {
 		points = append(points, GeoPoint{
 			Lat:           item.Lat,
@@ -121,7 +134,7 @@ func (tl *TriggerLogic) EvaluateAndTrigger(zoneID int, newScore int, threshold i
 		return fmt.Errorf("error publicando solicitud de planificación: %w", err)
 	}
 
-	log.Printf("✅ Publicado request %s a RabbitMQ con %d puntos", requestID, len(points))
+	log.Printf("✅ Publicado request %s a RabbitMQ con %d puntos (1 DEPOT + %d incidentes)", requestID, len(points), len(pendingItems))
 
 	// 4. Actualizar estado de items a 'PROCESSING'
 	err = tl.updatePendingItemsStatus(zoneID, "PROCESSING")
@@ -130,6 +143,15 @@ func (tl *TriggerLogic) EvaluateAndTrigger(zoneID int, newScore int, threshold i
 	}
 
 	log.Printf("✅ Actualizados %d items a estado PROCESSING", len(pendingItems))
+
+	// 5. RESETEAR el score de la zona a 0 después de emitir el mensaje
+	err = tl.zoneRepo.ResetScore(uint(zoneID))
+	if err != nil {
+		log.Printf("⚠️ Error reseteando score de zona %d: %v", zoneID, err)
+		// No fallar el proceso si no se puede resetear
+	} else {
+		log.Printf("🔄 Score de zona %d (%s) reseteado a 0", zoneID, zoneName)
+	}
 
 	return nil
 }

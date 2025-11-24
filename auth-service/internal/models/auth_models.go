@@ -91,10 +91,15 @@ func (OutboxEvent) TableName() string {
 
 // RegisterOperatorRequest es el payload para registrar un nuevo operador
 type RegisterOperatorRequest struct {
-	Name     string `json:"name" binding:"required,min=2"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=8"`
-	Role     string `json:"role" binding:"required,oneof=operador despachador admin"`
+	FullName          string `json:"full_name" binding:"required,min=2"`
+	Username          string `json:"username" binding:"required,min=3"`
+	Password          string `json:"password" binding:"required,min=8"`
+	LicenseID         string `json:"license_id" binding:"required"`
+	PreferredZoneID   *int   `json:"preferred_zone_id"`
+	CanDriveLateral   bool   `json:"can_drive_lateral"`
+	CanDriveCompactor bool   `json:"can_drive_compactor"`
+	Email             string `json:"email" binding:"omitempty,email"`
+	Role              string `json:"role" binding:"required,oneof=operador despachador admin"`
 }
 
 // LoginOperatorRequest es el payload para login de operador
@@ -118,12 +123,17 @@ type VerifyOTPRequest struct {
 
 // OperatorResponse es la respuesta con datos del operador
 type OperatorResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
+	ID                string    `json:"id"`
+	FullName          string    `json:"full_name"`
+	Username          string    `json:"username"`
+	Email             string    `json:"email,omitempty"`
+	Role              string    `json:"role"`
+	LicenseID         string    `json:"license_id"`
+	PreferredZoneID   *int      `json:"preferred_zone_id,omitempty"`
+	CanDriveLateral   bool      `json:"can_drive_lateral"`
+	CanDriveCompactor bool      `json:"can_drive_compactor"`
+	Active            bool      `json:"active"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 // TokenResponse es la respuesta con JWT token

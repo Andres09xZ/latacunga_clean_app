@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"os"
 
 	"github.com/Andres09xZ/latacunga_clean_app/incident-service/docs"
 	"github.com/Andres09xZ/latacunga_clean_app/incident-service/internal/database"
@@ -47,16 +48,20 @@ func Start() {
 	r.GET("/health", handlers.CheckHealth)
 
 	// Incident routes (offline-first, ciudadanos)
-	// CreateIncident: Requiere JWT (extrae reporter_kind y reporter_id del token, solo ciudadanos)
-	r.POST("/api/v1/incidents", middleware.JWTAuth(), handlers.CreateIncident)
+	// CreateIncident: Requiere autenticación JWT (ciudadanos tipo "user")
+	r.POST("/api/v1/incidents", middleware.JWTAuth(), middleware.RequireRole("user", "admin"), handlers.CreateIncident)
 	r.GET("/api/v1/incidents", handlers.ListIncidents)
 	r.GET("/api/v1/incidents/:id", handlers.GetIncident)
 	r.PUT("/api/v1/incidents/:id/status", middleware.JWTAuth(), middleware.RequireRole("operador", "admin"), handlers.UpdateIncidentStatus)
 	r.POST("/api/v1/incidents/:id/attachments", middleware.JWTAuth(), handlers.AddIncidentAttachment)
 
-	addr := ":8081"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8082"
+	}
+	addr := ":" + port
 	log.Printf("Starting incident service on %s", addr)
-	log.Printf("Swagger documentation available at http://localhost:8081/swagger/index.html")
+	log.Printf("Swagger documentation available at http://localhost:%s/swagger/index.html", port)
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}

@@ -43,11 +43,14 @@ type IncomingIncident struct {
 
 // ValidationResult es el payload de validación
 type ValidationResult struct {
-	IncidentID  string `json:"incident_id"`
-	Status      string `json:"status"`
-	Validator   string `json:"validator"`
-	ValidatedAt string `json:"validated_at"`
-	Notes       string `json:"notes,omitempty"`
+	IncidentID  string  `json:"incident_id"`
+	Status      string  `json:"status"`
+	Validator   string  `json:"validator"`
+	ValidatedAt string  `json:"validated_at"`
+	Notes       string  `json:"notes,omitempty"`
+	Tipo        string  `json:"tipo"`
+	Latitud     float64 `json:"latitud"`
+	Longitud    float64 `json:"longitud"`
 }
 
 // ValidateRequest es el payload para validar un incidente
@@ -80,7 +83,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8082"
+		port = "8084"
 	}
 
 	log.Println("🚀 Validation Service (Decoupled with own DB)")
@@ -378,6 +381,10 @@ func validateIncident(c *gin.Context) {
 		Validator:   validator,
 		ValidatedAt: now.UTC().Format(time.RFC3339),
 		Notes:       req.Notes,
+		// Agregar datos necesarios para el scheduler
+		Tipo:     incidente.Tipo,
+		Latitud:  incidente.Latitud,
+		Longitud: incidente.Longitud,
 	}
 
 	if err := publishValidationResult(rabbitChannel, result2); err != nil {

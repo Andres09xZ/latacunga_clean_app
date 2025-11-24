@@ -3,12 +3,14 @@
 import (
 	"crypto/rand"
 	"fmt"
+	"log"
 	"net/http"
 	"regexp"
 	"time"
 
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/auth"
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/messaging"
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/models"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
@@ -82,8 +84,15 @@ func Register(c *gin.Context) {
 		return
 	}
 
+	// Generate username from email (before @ symbol)
+	username := req.Email
+	if atIndex := regexp.MustCompile(`@`).FindStringIndex(req.Email); atIndex != nil {
+		username = req.Email[:atIndex[0]]
+	}
+
 	// Create user
 	user := models.User{
+		Username:     username,
 		Email:        &req.Email,
 		PasswordHash: stringPtr(string(hashed)),
 		Role:         req.Role,
@@ -124,7 +133,7 @@ func Register(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
-// @Router /auth/login [post]
+// @Router /api/v1/auth/login [post]
 func Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -169,7 +178,7 @@ func Login(c *gin.Context) {
 // @Success 200 {object} map[string]string
 // @Failure 400 {object} map[string]string
 // @Failure 403 {object} map[string]string
-// @Router /auth/otp/send [post]
+// @Router /api/v1/auth/otp/send [post]
 func RequestOTP(c *gin.Context) {
 	var req OTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -232,7 +241,7 @@ func RequestOTP(c *gin.Context) {
 // @Success 200 {object} map[string]interface{}
 // @Failure 400 {object} map[string]string
 // @Failure 429 {object} map[string]string
-// @Router /auth/otp/verify [post]
+// @Router /api/v1/auth/otp/verify [post]
 func VerifyOTP(c *gin.Context) {
 	var req OTPVerifyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -273,6 +282,7 @@ func VerifyOTP(c *gin.Context) {
 	if err := database.DB.Where("phone = ?", req.Phone).First(&user).Error; err != nil {
 		// Create new user
 		user = models.User{
+			Username:    req.Phone, // Use phone as username
 			Phone:       &req.Phone,
 			Role:        "user",
 			DisplayName: req.Phone, // Use phone as display name
@@ -294,6 +304,126 @@ func VerifyOTP(c *gin.Context) {
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 	})
+}
+
+// RegisterOperator creates a new operator with full profile
+//
+//	@Summary	Register a new operator
+//	@Description	Create a new operator account with full profile including license, zone preference, and vehicle capabilities
+//	@Tags		auth
+//	@Accept		json
+//	@Produce	json
+//	@Param		request	body		models.RegisterOperatorRequest	true	"Operator registration request"
+//	@Success	201		{object}	models.OperatorResponse
+//	@Failure	400		{object}	map[string]string
+//	@Failure	409		{object}	map[string]string
+//	@Failure	500		{object}	map[string]string
+//	@Router		/api/v1/auth/operators [post]
+func RegisterOperator(c *gin.Context) {
+	var req models.RegisterOperatorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate role is operador
+	if req.Role != "operador" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Role must be 'operador'"})
+		return
+	}
+
+	// Check if username already exists
+	var existingUser models.User
+	if err := database.DB.Where("username = ?", req.Username).First(&existingUser).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+		return
+	}
+
+	// Hash password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	// Begin transaction
+	tx := database.DB.Begin()
+
+	// Create user
+	user := models.User{
+		Username:     req.Username,
+		Email:        &req.Email,
+		PasswordHash: stringPtr(string(hashed)),
+		Role:         req.Role,
+		DisplayName:  req.FullName,
+		Status:       "ACTIVE",
+	}
+
+	if err := tx.Create(&user).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		return
+	}
+
+	// Create operator profile
+	operatorProfile := models.OperatorProfile{
+		UserID:            user.ID,
+		FullName:          req.FullName,
+		Username:          req.Username,
+		LicenseID:         req.LicenseID,
+		PreferredZoneID:   req.PreferredZoneID,
+		CanDriveLateral:   req.CanDriveLateral,
+		CanDriveCompactor: req.CanDriveCompactor,
+		Status:            "disponible",
+	}
+
+	if err := tx.Create(&operatorProfile).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create operator profile"})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction"})
+		return
+	}
+
+	// Publish RabbitMQ event (non-blocking, log error if fails)
+	go func() {
+		payload := map[string]interface{}{
+			"event_type":          "operator.created",
+			"user_id":             user.ID.String(),
+			"username":            req.Username,
+			"full_name":           req.FullName,
+			"license_id":          req.LicenseID,
+			"preferred_zone_id":   req.PreferredZoneID,
+			"can_drive_lateral":   req.CanDriveLateral,
+			"can_drive_compactor": req.CanDriveCompactor,
+			"email":               req.Email,
+		}
+
+		if err := messaging.PublishEvent("identity.operator.created.v1", payload); err != nil {
+			log.Printf("Failed to publish operator.created event: %v", err)
+		}
+	}()
+
+	// Return response
+	response := models.OperatorResponse{
+		ID:                user.ID.String(),
+		FullName:          req.FullName,
+		Username:          req.Username,
+		Email:             req.Email,
+		Role:              user.Role,
+		LicenseID:         req.LicenseID,
+		PreferredZoneID:   req.PreferredZoneID,
+		CanDriveLateral:   req.CanDriveLateral,
+		CanDriveCompactor: req.CanDriveCompactor,
+		Active:            user.Status == "ACTIVE",
+		CreatedAt:         user.CreatedAt,
+	}
+
+	c.JSON(http.StatusCreated, response)
 }
 
 // Helper functions

@@ -7,6 +7,7 @@ import (
 	_ "github.com/Andres09xZ/latacunga_clean_app/auth-service/docs"
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/database"
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/handlers"
+	"github.com/Andres09xZ/latacunga_clean_app/auth-service/internal/messaging"
 	"github.com/Andres09xZ/latacunga_clean_app/auth-service/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,11 @@ import (
 func Start() {
 	// Initialize database
 	database.InitDB()
+
+	// Initialize RabbitMQ
+	if err := messaging.InitRabbitMQ(); err != nil {
+		log.Printf("Warning: RabbitMQ initialization failed: %v", err)
+	}
 
 	r := gin.Default()
 
@@ -31,9 +37,10 @@ func Start() {
 		authGroup.POST("/login", handlers.Login)
 		authGroup.POST("/otp/send", handlers.RequestOTP)
 		authGroup.POST("/otp/verify", handlers.VerifyOTP)
+		authGroup.POST("/operators", handlers.RegisterOperator) // Sin restricción de admin
 	}
 
-	// Admin routes (example)
+	// Admin routes
 	admin := r.Group("/api/v1/admin")
 	admin.Use(middleware.JWTAuth(), middleware.RequireRole("admin"))
 	{

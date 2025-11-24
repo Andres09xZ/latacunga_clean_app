@@ -92,8 +92,8 @@ type PlanningResult struct {
 // Se guarda cada incidente recibido mientras la zona acumula puntos.
 type PendingItem struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
-	Lat           float64   `gorm:"not null" json:"lat"`                                                       // Latitud del incidente
-	Lon           float64   `gorm:"not null" json:"lon"`                                                       // Longitud del incidente
+	Latitude      *float64  `gorm:"column:lat" json:"lat"`                                                     // Latitud del incidente (puntero para RPC)
+	Longitude     *float64  `gorm:"column:lon" json:"lon"`                                                     // Longitud del incidente (puntero para RPC)
 	IncidentID    string    `gorm:"size:100;uniqueIndex" json:"incident_id"`                                   // ID único del incidente
 	ZoneID        uint      `gorm:"not null;index:idx_pending_zone" json:"zone_id"`                            // Zona donde ocurrió
 	GravityPoints int       `gorm:"not null" json:"gravity_points"`                                            // Puntos asignados según tipo

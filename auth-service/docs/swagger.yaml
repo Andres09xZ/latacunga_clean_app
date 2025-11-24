@@ -1,4 +1,3 @@
-basePath: /api/v1
 definitions:
   handlers.LoginRequest:
     properties:
@@ -45,6 +44,65 @@ definitions:
     - password
     - role
     type: object
+  models.OperatorResponse:
+    properties:
+      active:
+        type: boolean
+      can_drive_compactor:
+        type: boolean
+      can_drive_lateral:
+        type: boolean
+      created_at:
+        type: string
+      email:
+        type: string
+      full_name:
+        type: string
+      id:
+        type: string
+      license_id:
+        type: string
+      preferred_zone_id:
+        type: integer
+      role:
+        type: string
+      username:
+        type: string
+    type: object
+  models.RegisterOperatorRequest:
+    properties:
+      can_drive_compactor:
+        type: boolean
+      can_drive_lateral:
+        type: boolean
+      email:
+        type: string
+      full_name:
+        minLength: 2
+        type: string
+      license_id:
+        type: string
+      password:
+        minLength: 8
+        type: string
+      preferred_zone_id:
+        type: integer
+      role:
+        enum:
+        - operador
+        - despachador
+        - admin
+        type: string
+      username:
+        minLength: 3
+        type: string
+    required:
+    - full_name
+    - license_id
+    - password
+    - role
+    - username
+    type: object
   models.User:
     properties:
       created_at:
@@ -63,13 +121,11 @@ definitions:
         type: string
       updated_at:
         type: string
+      username:
+        type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
-  description: Servicio de autenticación para registro y login de usuarios
-  title: Auth Service API
-  version: "1.0"
 paths:
   /api/v1/admin/users:
     get:
@@ -96,7 +152,7 @@ paths:
       summary: List all users
       tags:
       - Users
-  /auth/login:
+  /api/v1/auth/login:
     post:
       consumes:
       - application/json
@@ -132,7 +188,48 @@ paths:
       summary: Login user
       tags:
       - auth
-  /auth/otp/send:
+  /api/v1/auth/operators:
+    post:
+      consumes:
+      - application/json
+      description: Create a new operator account with full profile including license,
+        zone preference, and vehicle capabilities
+      parameters:
+      - description: Operator registration request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.OperatorResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new operator
+      tags:
+      - auth
+  /api/v1/auth/otp/send:
     post:
       consumes:
       - application/json
@@ -168,7 +265,7 @@ paths:
       summary: Request OTP
       tags:
       - otp
-  /auth/otp/verify:
+  /api/v1/auth/otp/verify:
     post:
       consumes:
       - application/json

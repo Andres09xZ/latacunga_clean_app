@@ -36,21 +36,15 @@ func InitDB() {
 		log.Fatal("Failed to create usuario schema:", err)
 	}
 
-	// Drop old tables if they exist
-	if err = DB.Migrator().DropTable(&models.User{}); err != nil {
-		log.Printf("Warning: Could not drop users table: %v", err)
-	}
-
-	// Auto-migrate new models
+	// Auto-migrate models
 	err = DB.AutoMigrate(
-		&models.Operator{},
-		&models.Citizen{},
-		&models.OTPRequest{},
-		&models.IdempotencyKey{},
-		&models.OutboxEvent{},
-		&models.RefreshToken{},
+		&models.User{},
+		&models.OTPCode{},
+		&models.OperatorProfile{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+
+	log.Println("Database migration completed successfully")
 }

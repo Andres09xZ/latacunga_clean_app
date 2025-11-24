@@ -16,6 +16,7 @@ type IZoneRepository interface {
 	GetMetrics(zoneID uint) (*models.ZoneMetrics, error)
 	UpsertMetrics(m *models.ZoneMetrics) error
 	UpdateStatus(zoneID uint, status string) error
+	ResetScore(zoneID uint) error
 }
 
 type ZoneRepository struct{ db *gorm.DB }
@@ -138,4 +139,21 @@ func (r *ZoneRepository) UpdateThresholds(th map[string]int) error {
 		}
 	}
 	return nil
+}
+
+// ResetScore resetea el current_score de una zona a 0.
+func (r *ZoneRepository) ResetScore(zoneID uint) error {
+	m, err := r.GetMetrics(zoneID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Si no existe, crear con score 0
+			m = &models.ZoneMetrics{ZoneID: zoneID, Threshold: 50, CurrentScore: 0}
+			return r.db.Create(m).Error
+		}
+		return err
+	}
+
+	// Resetear el score a 0
+	m.CurrentScore = 0
+	return r.UpsertMetrics(m)
 }

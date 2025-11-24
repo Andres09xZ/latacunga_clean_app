@@ -1,0 +1,728 @@
+basePath: /api/v1
+definitions:
+  handlers.ActiveShiftResponse:
+    properties:
+      id:
+        example: 650e8400-e29b-41d4-a716-446655440099
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      start_time:
+        example: "2024-01-15T08:00:00Z"
+        type: string
+      truck_id:
+        example: 1
+        type: integer
+    type: object
+  handlers.ClockInRequest:
+    properties:
+      driver_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      truck_plate:
+        example: ABC-1234
+        type: string
+    required:
+    - driver_id
+    - truck_plate
+    type: object
+  handlers.ClockInResponse:
+    properties:
+      message:
+        example: Turno iniciado exitosamente
+        type: string
+      shift_id:
+        example: 550e8400-e29b-41d4-a716-446655440099
+        type: string
+    type: object
+  handlers.ClockOutRequest:
+    properties:
+      driver_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - driver_id
+    type: object
+  handlers.ClockOutResponse:
+    properties:
+      message:
+        example: Turno finalizado exitosamente
+        type: string
+    type: object
+  handlers.CreateTruckRequest:
+    properties:
+      plate:
+        example: ABC-1234
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.TruckStatus'
+        example: DISPONIBLE
+      type:
+        allOf:
+        - $ref: '#/definitions/models.TruckType'
+        example: CARGA_LATERAL
+    required:
+    - plate
+    - type
+    type: object
+  handlers.DriverResponse:
+    properties:
+      active_shifts:
+        items:
+          $ref: '#/definitions/handlers.ActiveShiftResponse'
+        type: array
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      full_name:
+        example: Juan Pérez
+        type: string
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      operator_profile:
+        $ref: '#/definitions/handlers.OperatorProfileResponse'
+      status:
+        allOf:
+        - $ref: '#/definitions/models.DriverStatus'
+        example: DISPONIBLE
+      updated_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+    type: object
+  handlers.DriverStatsResponse:
+    properties:
+      active_shifts:
+        example: 1
+        type: integer
+      completed_shifts:
+        example: 24
+        type: integer
+      driver_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      full_name:
+        example: Juan Pérez
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.DriverStatus'
+        example: DISPONIBLE
+      total_shifts:
+        example: 25
+        type: integer
+    type: object
+  handlers.ErrorResponse:
+    properties:
+      error:
+        example: Mensaje de error descriptivo
+        type: string
+    type: object
+  handlers.ListDriversResponse:
+    properties:
+      count:
+        example: 5
+        type: integer
+      drivers:
+        items:
+          $ref: '#/definitions/handlers.DriverResponse'
+        type: array
+    type: object
+  handlers.ListTrucksResponse:
+    properties:
+      count:
+        example: 5
+        type: integer
+      trucks:
+        items:
+          $ref: '#/definitions/handlers.TruckResponse'
+        type: array
+    type: object
+  handlers.OperatorProfileResponse:
+    properties:
+      can_drive_lateral:
+        example: true
+        type: boolean
+      can_drive_posterior:
+        example: false
+        type: boolean
+      id:
+        example: 1
+        type: integer
+      preferred_zone_id:
+        example: 3
+        type: integer
+    type: object
+  handlers.TruckResponse:
+    properties:
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      id:
+        example: 1
+        type: integer
+      plate:
+        example: ABC-1234
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.TruckStatus'
+        example: DISPONIBLE
+      type:
+        allOf:
+        - $ref: '#/definitions/models.TruckType'
+        example: CARGA_LATERAL
+      updated_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+    type: object
+  handlers.UpdateDriverRequest:
+    properties:
+      full_name:
+        example: Juan Pérez
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.DriverStatus'
+        example: DISPONIBLE
+    type: object
+  handlers.UpdateOperatorProfileRequest:
+    properties:
+      can_drive_lateral:
+        example: true
+        type: boolean
+      can_drive_posterior:
+        example: false
+        type: boolean
+      preferred_zone_id:
+        example: 3
+        type: integer
+    type: object
+  handlers.UpdateTruckRequest:
+    properties:
+      plate:
+        example: XYZ-5678
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.TruckStatus'
+        example: MANTENIMIENTO
+      type:
+        allOf:
+        - $ref: '#/definitions/models.TruckType'
+        example: CARGA_POSTERIOR
+    type: object
+  models.DriverStatus:
+    enum:
+    - OFFLINE
+    - DISPONIBLE
+    - OCUPADO
+    type: string
+    x-enum-varnames:
+    - DriverStatusOffline
+    - DriverStatusDisponible
+    - DriverStatusOcupado
+  models.TruckStatus:
+    enum:
+    - DISPONIBLE
+    - EN_USO
+    - MANTENIMIENTO
+    type: string
+    x-enum-varnames:
+    - TruckStatusDisponible
+    - TruckStatusEnUso
+    - TruckStatusMantenimiento
+  models.TruckType:
+    enum:
+    - CARGA_LATERAL
+    - CARGA_POSTERIOR
+    type: string
+    x-enum-varnames:
+    - TruckTypeCargaLateral
+    - TruckTypeCargaPosterior
+host: localhost:8084
+info:
+  contact:
+    email: soporte@latacunga-clean.com
+    name: API Support
+  description: API para gestión de flota de camiones, conductores y turnos
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Fleet Service API
+  version: "1.0"
+paths:
+  /drivers:
+    get:
+      description: Obtiene la lista de todos los conductores con filtros opcionales
+      parameters:
+      - description: Filtrar por estado
+        enum:
+        - OFFLINE
+        - DISPONIBLE
+        - OCUPADO
+        in: query
+        name: status
+        type: string
+      - description: Filtrar por zona preferida
+        in: query
+        name: zone_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de conductores
+          schema:
+            $ref: '#/definitions/handlers.ListDriversResponse'
+        "400":
+          description: Parámetros inválidos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Listar conductores
+      tags:
+      - Conductores
+  /drivers/{id}:
+    delete:
+      description: Elimina un conductor (solo si no tiene turnos activos)
+      parameters:
+      - description: ID del conductor (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Conductor eliminado exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: ID inválido o conductor con turnos activos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Eliminar conductor
+      tags:
+      - Conductores
+    get:
+      description: Obtiene la información de un conductor específico con su perfil
+        y turnos
+      parameters:
+      - description: ID del conductor (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Información del conductor
+          schema:
+            $ref: '#/definitions/handlers.DriverResponse'
+        "400":
+          description: ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtener conductor
+      tags:
+      - Conductores
+    put:
+      consumes:
+      - application/json
+      description: Actualiza la información básica de un conductor
+      parameters:
+      - description: ID del conductor (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos a actualizar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateDriverRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Conductor actualizado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.DriverResponse'
+        "400":
+          description: Datos inválidos o ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Actualizar conductor
+      tags:
+      - Conductores
+  /drivers/{id}/profile:
+    put:
+      consumes:
+      - application/json
+      description: Actualiza las preferencias y permisos del perfil de operador
+      parameters:
+      - description: ID del conductor (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Datos del perfil a actualizar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateOperatorProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Perfil actualizado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.OperatorProfileResponse'
+        "400":
+          description: Datos inválidos o ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor o perfil no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Actualizar perfil de operador
+      tags:
+      - Conductores
+  /drivers/{id}/stats:
+    get:
+      description: Obtiene estadísticas de turnos y actividad de un conductor
+      parameters:
+      - description: ID del conductor (UUID)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Estadísticas del conductor
+          schema:
+            $ref: '#/definitions/handlers.DriverStatsResponse'
+        "400":
+          description: ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtener estadísticas de conductor
+      tags:
+      - Conductores
+  /drivers/available:
+    get:
+      description: Lista conductores con turno activo y estado disponible
+      parameters:
+      - description: Filtrar por zona preferida
+        in: query
+        name: zone_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de conductores disponibles
+          schema:
+            $ref: '#/definitions/handlers.ListDriversResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtener conductores disponibles
+      tags:
+      - Conductores
+  /shifts/clock-in:
+    post:
+      consumes:
+      - application/json
+      description: Registra el inicio de turno de un conductor con un camión asignado
+      parameters:
+      - description: Datos del clock-in
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ClockInRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Turno iniciado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.ClockInResponse'
+        "400":
+          description: Datos inválidos o ID de conductor inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Conductor no encontrado o Camión no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "409":
+          description: El conductor ya tiene un turno activo o El camión no está disponible
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Iniciar turno (Clock-in)
+      tags:
+      - Turnos
+  /shifts/clock-out:
+    post:
+      consumes:
+      - application/json
+      description: Registra el fin de turno de un conductor, liberando el camión
+      parameters:
+      - description: Datos del clock-out
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ClockOutRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Turno finalizado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.ClockOutResponse'
+        "400":
+          description: Datos inválidos o ID de conductor inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: No se encontró un turno activo para este conductor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Finalizar turno (Clock-out)
+      tags:
+      - Turnos
+  /trucks:
+    get:
+      description: Obtiene la lista de todos los camiones con filtros opcionales
+      parameters:
+      - description: Filtrar por estado
+        enum:
+        - DISPONIBLE
+        - EN_USO
+        - MANTENIMIENTO
+        in: query
+        name: status
+        type: string
+      - description: Filtrar por tipo
+        enum:
+        - CARGA_LATERAL
+        - CARGA_POSTERIOR
+        in: query
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Lista de camiones
+          schema:
+            $ref: '#/definitions/handlers.ListTrucksResponse'
+        "400":
+          description: Parámetros inválidos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Listar camiones
+      tags:
+      - Camiones
+    post:
+      consumes:
+      - application/json
+      description: Registra un nuevo camión en la flota
+      parameters:
+      - description: Datos del camión
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateTruckRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Camión creado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.TruckResponse'
+        "400":
+          description: Datos inválidos o placa duplicada
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Crear camión
+      tags:
+      - Camiones
+  /trucks/{id}:
+    delete:
+      description: Elimina un camión de la flota (solo si no tiene turnos activos)
+      parameters:
+      - description: ID del camión
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Camión eliminado exitosamente
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: ID inválido o camión con turnos activos
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Camión no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Eliminar camión
+      tags:
+      - Camiones
+    get:
+      description: Obtiene la información de un camión específico por ID
+      parameters:
+      - description: ID del camión
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Información del camión
+          schema:
+            $ref: '#/definitions/handlers.TruckResponse'
+        "400":
+          description: ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Camión no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Obtener camión
+      tags:
+      - Camiones
+    put:
+      consumes:
+      - application/json
+      description: Actualiza la información de un camión existente
+      parameters:
+      - description: ID del camión
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Datos a actualizar
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateTruckRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Camión actualizado exitosamente
+          schema:
+            $ref: '#/definitions/handlers.TruckResponse'
+        "400":
+          description: Datos inválidos o ID inválido
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "404":
+          description: Camión no encontrado
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+        "500":
+          description: Error interno del servidor
+          schema:
+            $ref: '#/definitions/handlers.ErrorResponse'
+      summary: Actualizar camión
+      tags:
+      - Camiones
+schemes:
+- http
+- https
+swagger: "2.0"

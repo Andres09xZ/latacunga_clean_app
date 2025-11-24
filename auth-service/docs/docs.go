@@ -55,7 +55,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/login": {
+        "/api/v1/auth/login": {
             "post": {
                 "description": "Authenticate user with email and password, return access and refresh tokens",
                 "consumes": [
@@ -108,7 +108,68 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/otp/send": {
+        "/api/v1/auth/operators": {
+            "post": {
+                "description": "Create a new operator account with full profile including license, zone preference, and vehicle capabilities",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new operator",
+                "parameters": [
+                    {
+                        "description": "Operator registration request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.RegisterOperatorRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.OperatorResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/otp/send": {
             "post": {
                 "description": "Request OTP code for phone authentication (citizens only)",
                 "consumes": [
@@ -163,7 +224,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/otp/verify": {
+        "/api/v1/auth/otp/verify": {
             "post": {
                 "description": "Verify OTP code and authenticate/create user",
                 "consumes": [
@@ -337,6 +398,91 @@ const docTemplate = `{
                 }
             }
         },
+        "models.OperatorResponse": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "can_drive_compactor": {
+                    "type": "boolean"
+                },
+                "can_drive_lateral": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "license_id": {
+                    "type": "string"
+                },
+                "preferred_zone_id": {
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RegisterOperatorRequest": {
+            "type": "object",
+            "required": [
+                "full_name",
+                "license_id",
+                "password",
+                "role",
+                "username"
+            ],
+            "properties": {
+                "can_drive_compactor": {
+                    "type": "boolean"
+                },
+                "can_drive_lateral": {
+                    "type": "boolean"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "full_name": {
+                    "type": "string",
+                    "minLength": 2
+                },
+                "license_id": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 8
+                },
+                "preferred_zone_id": {
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "operador",
+                        "despachador",
+                        "admin"
+                    ]
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
+                }
+            }
+        },
         "models.User": {
             "type": "object",
             "properties": {
@@ -363,6 +509,9 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         }
@@ -371,12 +520,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "1.0",
-	Host:             "localhost:8080",
-	BasePath:         "/api/v1",
+	Version:          "",
+	Host:             "",
+	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Auth Service API",
-	Description:      "Servicio de autenticación para registro y login de usuarios",
+	Title:            "",
+	Description:      "",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

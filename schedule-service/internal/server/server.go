@@ -5,7 +5,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/consumers"
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/handlers"
+	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/messaging"
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/repository"
 	"github.com/Andres09xZ/latacunga_clean_app/schedule-service/internal/service"
 	"github.com/gin-gonic/gin"
@@ -15,14 +17,26 @@ import (
 	"gorm.io/gorm"
 )
 
-// initTriggerLogic inicializa la lógica de disparo para RabbitMQ
-func initTriggerLogic(
-	schedulerRepo repository.ISchedulerRepository,
+// initOrchestrator inicializa el orquestador RPC con Saga pattern
+func initOrchestrator(
 	pendingRepo repository.IPendingItemRepository,
 	zoneRepo repository.IZoneRepository,
 	rabbitConn *amqp.Connection,
-) (*service.TriggerLogic, error) {
-	return service.NewTriggerLogic(schedulerRepo, pendingRepo, zoneRepo, rabbitConn)
+	rabbitURL string,
+) (*service.Orchestrator, error) {
+	// Crear cliente RPC
+	rpcClient, err := messaging.NewRPCClient(rabbitURL)
+	if err != nil {
+		return nil, fmt.Errorf("error creando RPCClient: %w", err)
+	}
+
+	// Crear orchestrator
+	orchestrator, err := service.NewOrchestrator(rpcClient, pendingRepo, zoneRepo, rabbitConn)
+	if err != nil {
+		return nil, fmt.Errorf("error creando Orchestrator: %w", err)
+	}
+
+	return orchestrator, nil
 }
 
 type Server struct {
@@ -72,20 +86,33 @@ func (s *Server) Setup() error {
 	repo := repository.NewZoneRepository(s.db)
 	pendingRepo := repository.NewPendingItemRepository(s.db)
 	schedulerRepo := repository.NewSchedulerRepository(s.db)
-	
+
 	planning := handlers.NewPlanningHandler(repo, pendingRepo)
-	
-	// Inicializar TriggerLogic si RabbitMQ está disponible
-	if s.rabbitConn != nil {
-		triggerLogic, err := initTriggerLogic(schedulerRepo, pendingRepo, repo, s.rabbitConn)
+
+	// Inicializar Orchestrator (patrón Saga RPC) si RabbitMQ está disponible
+	if s.rabbitConn != nil && os.Getenv("RABBITMQ_URL") != "" {
+		orchestrator, err := initOrchestrator(pendingRepo, repo, s.rabbitConn, os.Getenv("RABBITMQ_URL"))
 		if err != nil {
-			log.Printf("⚠️ TriggerLogic initialization failed: %v", err)
+			log.Printf("⚠️ Orchestrator initialization failed: %v", err)
 		} else {
-			// Inyectar TriggerLogic al servicio (no al handler)
+			// Crear adaptador y conectar con PlanningService
+			orchestratorAdapter := service.NewOrchestratorAdapter(orchestrator)
 			planningService := planning.GetService()
-			planningService.SetTriggerLogic(triggerLogic)
+			planningService.SetTriggerLogic(orchestratorAdapter)
 			planningService.SetSchedulerRepo(schedulerRepo)
-			log.Println("✅ TriggerLogic initialized - routing requests will be published to RabbitMQ")
+			log.Println("✅ Orchestrator initialized - Saga RPC pattern enabled for zone triggers")
+		}
+
+		// Inicializar IncidentConsumer para escuchar incidents.validated.v1
+		incidentConsumer, err := consumers.NewIncidentConsumer(s.rabbitConn, planning.GetService())
+		if err != nil {
+			log.Printf("⚠️ IncidentConsumer initialization failed: %v", err)
+		} else {
+			if err := incidentConsumer.Start(); err != nil {
+				log.Printf("⚠️ Failed to start IncidentConsumer: %v", err)
+			} else {
+				log.Println("✅ IncidentConsumer started - listening for incidents.validated.v1")
+			}
 		}
 	}
 
@@ -95,6 +122,7 @@ func (s *Server) Setup() error {
 	v1.POST("/zones/:id/trigger", planning.ForceTrigger)
 	v1.PUT("/config/thresholds", planning.UpdateThresholds)
 	v1.POST("/simulate", planning.SimulateIncident)
+	v1.GET("/incidents", planning.ListPendingIncidents)
 
 	log.Println("✅ Planning Core routes ready")
 	log.Println("✅ Health check endpoints ready: /health and /health/rabbitmq")

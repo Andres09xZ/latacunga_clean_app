@@ -9,6 +9,7 @@ import (
 // User represents a user in the system
 type User struct {
 	ID           uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	Username     string    `json:"username" gorm:"uniqueIndex;not null"`
 	Email        *string   `json:"email,omitempty" gorm:"uniqueIndex"`
 	Phone        *string   `json:"phone,omitempty" gorm:"uniqueIndex"`
 	PasswordHash *string   `json:"-" gorm:"size:128"`
@@ -34,11 +35,22 @@ type OTPCode struct {
 
 // OperatorProfile represents additional information for operators
 type OperatorProfile struct {
-	ID        uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
-	UserID    uuid.UUID `json:"user_id" gorm:"type:uuid;not null"`
-	User      User      `json:"-" gorm:"foreignKey:UserID"`
-	BadgeID   *string   `json:"badge_id,omitempty"`
-	Status    string    `json:"status" gorm:"default:ACTIVE"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID                uuid.UUID `json:"id" gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
+	UserID            uuid.UUID `json:"user_id" gorm:"type:uuid;not null"`
+	User              User      `json:"-" gorm:"foreignKey:UserID"`
+	FullName          string    `json:"full_name" gorm:"type:varchar(200);not null"`
+	Username          string    `json:"username" gorm:"type:varchar(100);uniqueIndex;not null"`
+	LicenseID         string    `json:"license_id" gorm:"type:varchar(50);not null"`
+	PreferredZoneID   *int      `json:"preferred_zone_id,omitempty"`
+	CanDriveLateral   bool      `json:"can_drive_lateral" gorm:"default:false"`
+	CanDriveCompactor bool      `json:"can_drive_compactor" gorm:"default:false"`
+	BadgeID           *string   `json:"badge_id,omitempty"`
+	Status            string    `json:"status" gorm:"default:ACTIVE"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}
+
+// TableName specifies the table name for auth service operator profiles
+func (OperatorProfile) TableName() string {
+	return "auth_operator_profiles"
 }

@@ -45,12 +45,12 @@ func CreateIncident(c *gin.Context) {
 	// ==== EXTRAER DATOS DEL JWT TOKEN ====
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing user_id in token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Token JWT requerido"})
 		return
 	}
 
-	role, exists := c.Get("role")
-	if !exists {
+	role, roleExists := c.Get("role")
+	if !roleExists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing role in token"})
 		return
 	}
@@ -58,7 +58,7 @@ func CreateIncident(c *gin.Context) {
 	// Validar que solo ciudadanos pueden crear incidentes
 	// Aceptar tanto "ciudadano" como "user" (del auth-service)
 	reporterKind := role.(string)
-	if reporterKind != "ciudadano" && reporterKind != "user" {
+	if reporterKind != "ciudadano" && reporterKind != "user" && reporterKind != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "Solo ciudadanos pueden crear incidentes",
 			"role":  reporterKind,
@@ -67,11 +67,12 @@ func CreateIncident(c *gin.Context) {
 	}
 
 	// Normalizar el rol a "ciudadano" para la BD
-	if reporterKind == "user" {
+	if reporterKind == "user" || reporterKind == "admin" {
 		reporterKind = "ciudadano"
 	}
 
 	reporterID := userID.(string)
+
 	db := database.DB
 
 	// ==== IDEMPOTENCIA: Verificar si ya existe (solo si se proporciona idempotency_key) ====
@@ -571,6 +572,8 @@ func emitIncidentEvent(incident *models.Incident, eventType string) {
 	// Extraer latitud y longitud del campo location (POINT(lng lat))
 	var latitude, longitude float64
 	fmt.Sscanf(incident.Location, "POINT(%f %f)", &longitude, &latitude)
+
+	log.Printf("📍 Parsing location: '%s' -> lat: %.6f, lon: %.6f", incident.Location, latitude, longitude)
 
 	payload := map[string]interface{}{
 		"id":            incident.ID,

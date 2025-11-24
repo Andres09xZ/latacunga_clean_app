@@ -1,0 +1,439 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API para gestionar órdenes de trabajo y paradas de recolección",
+        "title": "Operations Service API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "support@latacunga.com"
+        },
+        "license": {
+            "name": "Apache 2.0",
+            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8085",
+    "basePath": "/",
+    "paths": {
+        "/api/v1/driver/orders/active": {
+            "get": {
+                "description": "Retrieves the active (ASIGNADA or EN_PROGRESO) work order for a specific driver",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "driver"
+                ],
+                "summary": "Get active work order for driver",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Driver UUID",
+                        "name": "driver_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.WorkOrderResponse"
+                        }
+                    },
+                    "204": {
+                        "description": "No active orders"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/driver/orders/{id}/finish": {
+            "post": {
+                "description": "Marks a work order as COMPLETADA, validates all stops are processed, and publishes completion event",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "driver"
+                ],
+                "summary": "Finish work order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Work Order UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "End location",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.FinishOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/driver/orders/{id}/start": {
+            "post": {
+                "description": "Marks a work order as IN_PROGRESS and records start time",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "driver"
+                ],
+                "summary": "Start work order",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Work Order UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Start location",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.StartOrderRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/driver/stops/{id}/complete": {
+            "post": {
+                "description": "Marks a work order stop as RECOGIDO or NO_RECOGIDO",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "driver"
+                ],
+                "summary": "Complete a stop",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stop ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Stop completion data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.CompleteStopRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.SuccessResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.CompleteStopRequest": {
+            "type": "object",
+            "required": [
+                "status"
+            ],
+            "properties": {
+                "comment": {
+                    "type": "string"
+                },
+                "status": {
+                    "enum": [
+                        "RECOGIDO",
+                        "NO_RECOGIDO"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/models.StopStatus"
+                        }
+                    ]
+                }
+            }
+        },
+        "models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.FinishOrderRequest": {
+            "type": "object",
+            "required": [
+                "end_latitude",
+                "end_longitude"
+            ],
+            "properties": {
+                "end_latitude": {
+                    "type": "number"
+                },
+                "end_longitude": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.StartOrderRequest": {
+            "type": "object",
+            "required": [
+                "start_latitude",
+                "start_longitude"
+            ],
+            "properties": {
+                "start_latitude": {
+                    "type": "number"
+                },
+                "start_longitude": {
+                    "type": "number"
+                }
+            }
+        },
+        "models.StopStatus": {
+            "type": "string",
+            "enum": [
+                "PENDIENTE",
+                "RECOGIDO",
+                "NO_RECOGIDO"
+            ],
+            "x-enum-varnames": [
+                "StopStatusPending",
+                "StopStatusCollected",
+                "StopStatusNotCollected"
+            ]
+        },
+        "models.SuccessResponse": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.WorkOrderResponse": {
+            "type": "object",
+            "properties": {
+                "assigned_at": {
+                    "type": "string"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "completed_stops": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "driver_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "request_id": {
+                    "description": "Referencia del Scheduler",
+                    "type": "string"
+                },
+                "route_polyline": {
+                    "description": "Geometría de OSRM",
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/models.WorkOrderStatus"
+                },
+                "stops": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.WorkOrderStop"
+                    }
+                },
+                "total_stops": {
+                    "type": "integer"
+                },
+                "truck_plate": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "zone_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.WorkOrderStatus": {
+            "type": "string",
+            "enum": [
+                "ASIGNADA",
+                "EN_PROGRESO",
+                "COMPLETADA"
+            ],
+            "x-enum-varnames": [
+                "WorkOrderStatusAssigned",
+                "WorkOrderStatusInProgress",
+                "WorkOrderStatusCompleted"
+            ]
+        },
+        "models.WorkOrderStop": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "incident_ref_id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "sequence_order": {
+                    "description": "Orden de visita",
+                    "type": "integer"
+                },
+                "serviced_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/models.StopStatus"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "work_order_id": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

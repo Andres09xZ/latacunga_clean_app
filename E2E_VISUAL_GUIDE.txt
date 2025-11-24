@@ -1,0 +1,293 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                   🧪 SISTEMA DE PRUEBAS E2E COMPLETO 🧪                   ║
+║                                                                            ║
+║                    Sistema EPAGAL - Latacunga Clean App                   ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                           📁 ARCHIVOS CREADOS                              │
+└────────────────────────────────────────────────────────────────────────────┘
+
+1. ✅ e2e_test.go (670 líneas)
+   └─ Script principal de prueba en Go
+   └─ Valida flujo completo end-to-end
+   └─ Output con colores ANSI
+   └─ 5 pasos de validación secuencial
+
+2. ✅ run_e2e_test.ps1 (143 líneas)
+   └─ Script auxiliar de verificación
+   └─ Comprueba prerrequisitos
+   └─ Ejecuta prueba automáticamente
+   └─ Reporte de resultados
+
+3. ✅ cleanup_e2e_data.ps1 (117 líneas)
+   └─ Script de limpieza de datos
+   └─ Elimina datos de prueba
+   └─ Confirmación obligatoria
+   └─ Reporte de eliminaciones
+
+4. ✅ E2E_README.md (465 líneas)
+   └─ Documentación completa
+   └─ Diagramas de arquitectura
+   └─ Troubleshooting detallado
+   └─ Guía de personalización
+
+5. ✅ QUICKSTART_E2E.md (215 líneas)
+   └─ Guía de inicio rápido
+   └─ 3 comandos para ejecutar
+   └─ FAQ y troubleshooting
+   └─ Verificaciones post-prueba
+
+6. ✅ E2E_SUMMARY.md (358 líneas)
+   └─ Resumen ejecutivo
+   └─ Métricas de rendimiento
+   └─ Criterios de éxito
+   └─ Historial de versiones
+
+7. ✅ RUN_COMPLETE_TEST.ps1 (46 líneas)
+   └─ Script todo-en-uno
+   └─ Levanta servicios + ejecuta test
+   └─ Verificación automática
+   └─ Opción de limpieza
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          🚀 CÓMO EJECUTAR                                  │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ OPCIÓN 1: Automático (Recomendado) ─────────────────────────────────────┐
+│                                                                            │
+│   .\run_e2e_test.ps1                                                      │
+│                                                                            │
+│   • Verifica servicios                                                    │
+│   • Verifica RabbitMQ                                                     │
+│   • Ejecuta prueba E2E                                                    │
+│   • Muestra reporte final                                                 │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ OPCIÓN 2: Manual ────────────────────────────────────────────────────────┐
+│                                                                            │
+│   go run e2e_test.go                                                      │
+│                                                                            │
+│   • Ejecución directa                                                     │
+│   • Sin verificación previa                                               │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ OPCIÓN 3: Todo-en-Uno ───────────────────────────────────────────────────┐
+│                                                                            │
+│   .\RUN_COMPLETE_TEST.ps1                                                 │
+│                                                                            │
+│   • Levanta servicios (docker-compose)                                    │
+│   • Espera 30 segundos                                                    │
+│   • Verifica conectividad                                                 │
+│   • Ejecuta prueba E2E                                                    │
+│   • Opción de limpieza de datos                                           │
+│                                                                            │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         📊 FLUJO DE PRUEBA                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+
+PASO 1: Onboarding del Operador 🚶
+├─ POST /api/v1/auth/operators
+├─ Evento: identity.operator.created.v1
+├─ Fleet consume y crea Driver
+└─ ✓ Operador registrado y sincronizado
+
+PASO 2: Inicio de Turno 🚛
+├─ POST /api/v1/shifts/clock-in
+├─ Asigna camión LAA-1020
+└─ ✓ Conductor disponible
+
+PASO 3: Generación de Demanda 📍
+├─ 15x POST /api/v1/incidents (Zona 1)
+├─ Validation calcula gravedad
+├─ Scheduler acumula puntos
+└─ ✓ Score ≥ 50 → Zona TRIGGERED
+
+PASO 4: Asignación y Ruteo 🗺️
+├─ Scheduler detecta zona triggered
+├─ Fleet asigna conductor
+├─ Routing calcula ruta (OSRM)
+├─ Operations crea Work Order
+└─ ✓ Orden ASIGNADA con paradas
+
+PASO 5: Ejecución y Cierre ✅
+├─ POST /orders/:id/start
+├─ Nx POST /stops/:id/complete
+├─ POST /orders/:id/finish
+├─ Evento: workorder.completed.v1
+├─ Fleet libera conductor
+└─ ✓ Score → 0, Conductor DISPONIBLE
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      🎯 SERVICIOS VALIDADOS                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Auth Service ────────────────────────────────────────────────────────────┐
+│ Puerto: 8080                                                               │
+│ Health: http://localhost:8080/health                                       │
+│ Swagger: http://localhost:8080/swagger/index.html                         │
+│ Funciones: Registro, Login, JWT                                           │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Fleet Service ───────────────────────────────────────────────────────────┐
+│ Puerto: 8081                                                               │
+│ Health: http://localhost:8081/health                                       │
+│ Swagger: http://localhost:8081/swagger/index.html                         │
+│ Funciones: Clock-in, Asignación, Estado de conductores                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Incident Service ────────────────────────────────────────────────────────┐
+│ Puerto: 8082                                                               │
+│ Health: http://localhost:8082/health                                       │
+│ Swagger: http://localhost:8082/swagger/index.html                         │
+│ Funciones: Reportes ciudadanos, Validación                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Scheduler Service ───────────────────────────────────────────────────────┐
+│ Puerto: 8083                                                               │
+│ Health: http://localhost:8083/health                                       │
+│ Funciones: Acumulación de score, Trigger de zonas                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ Operations Service ──────────────────────────────────────────────────────┐
+│ Puerto: 8085                                                               │
+│ Health: http://localhost:8085/health                                       │
+│ Swagger: http://localhost:8085/swagger/index.html                         │
+│ Funciones: Órdenes de trabajo, Gestión de paradas                         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌─ RabbitMQ ────────────────────────────────────────────────────────────────┐
+│ Puerto AMQP: 5672                                                          │
+│ Puerto Web: 15672                                                          │
+│ Management: http://localhost:15672                                         │
+│ Credentials: tesis / tesis                                                 │
+│ Exchanges: city.cleaning.identity, city.cleaning.operations, etc.         │
+└────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                     ✅ CRITERIOS DE ÉXITO                                  │
+└────────────────────────────────────────────────────────────────────────────┘
+
+La prueba es EXITOSA cuando:
+
+✅ Todos los servicios responden 200 en /health
+✅ RabbitMQ está activo (puerto 5672 y 15672)
+✅ Los 5 pasos se completan sin errores rojos
+✅ Operador registrado correctamente
+✅ Turno iniciado con camión asignado
+✅ 15 incidentes creados en Zona 1
+✅ Score de zona ≥ 50 (TRIGGERED)
+✅ Orden de trabajo asignada con paradas
+✅ Ruta (polyline) generada por OSRM
+✅ Todas las paradas completadas
+✅ Orden finalizada exitosamente
+✅ Conductor liberado (DISPONIBLE)
+✅ Score de zona reiniciado a 0
+✅ Mensaje final: "🎉 ¡TESIS FUNCIONAL! 🎉"
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                    🧹 LIMPIEZA DE DATOS                                    │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Para eliminar datos generados por las pruebas:
+
+    .\cleanup_e2e_data.ps1
+
+Esto eliminará:
+• Operadores test_driver_*
+• Incidentes "E2E Test"
+• Órdenes de trabajo asociadas
+• Turnos relacionados
+• Eventos de outbox antiguos
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      📚 DOCUMENTACIÓN                                      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+• E2E_README.md        → Documentación completa (465 líneas)
+• QUICKSTART_E2E.md    → Guía rápida (215 líneas)
+• E2E_SUMMARY.md       → Resumen ejecutivo (358 líneas)
+• THIS_FILE.txt        → Guía visual (este archivo)
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                     ⏱️ TIEMPO DE EJECUCIÓN                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Tiempo total esperado: 30-40 segundos
+
+Desglose:
+• Paso 1 (Onboarding):     ~5 segundos
+• Paso 2 (Turno):          ~2 segundos
+• Paso 3 (Demanda):        ~15 segundos
+• Paso 4 (Asignación):     ~12 segundos
+• Paso 5 (Ejecución):      ~8 segundos
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                   🔧 TROUBLESHOOTING RÁPIDO                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Problema: "Service NOT AVAILABLE"
+└─ Solución: docker-compose up -d
+
+Problema: "No se encontró orden activa"
+└─ Causa: Score < 50, RabbitMQ caído, o OSRM falló
+└─ Solución: Ver logs de Scheduler, Routing y Operations
+
+Problema: Timeout
+└─ Solución: Aumentar timeouts en e2e_test.go
+
+Problema: Datos duplicados
+└─ Solución: .\cleanup_e2e_data.ps1
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                      🎓 CONTEXTO ACADÉMICO                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+
+Este sistema de pruebas valida la hipótesis de la tesis:
+
+    "Un sistema de microservicios basado en eventos puede coordinar
+    eficientemente la recolección de residuos utilizando datos de
+    reportes ciudadanos, asignación inteligente y ruteo optimizado."
+
+Validaciones técnicas:
+✅ Arquitectura de Microservicios (7 servicios)
+✅ Event-Driven Architecture (RabbitMQ)
+✅ Procesamiento Asíncrono
+✅ Ruteo Optimizado (OSRM)
+✅ Escalabilidad
+✅ Resiliencia
+✅ Observabilidad
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│                         🚀 INICIO RÁPIDO                                   │
+└────────────────────────────────────────────────────────────────────────────┘
+
+3 comandos para ejecutar todo:
+
+    1. docker-compose up -d
+    2. Start-Sleep -Seconds 30
+    3. .\run_e2e_test.ps1
+
+O simplemente:
+
+    .\RUN_COMPLETE_TEST.ps1
+
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                     ✨ ¡LISTO PARA PROBAR! ✨                             ║
+║                                                                            ║
+║            Si ves el mensaje "🎉 ¡TESIS FUNCIONAL! 🎉"                   ║
+║              tu sistema está completo y funcionando                        ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+Autor: Andrés Sebastián
+Proyecto: Sistema de Gestión Inteligente de Residuos - EPAGAL Latacunga
+Fecha: Noviembre 2025
+Versión: 1.0.0

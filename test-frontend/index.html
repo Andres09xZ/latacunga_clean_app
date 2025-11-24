@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Limpieza - Latacunga</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧹 Sistema de Gestión de Limpieza - Latacunga</h1>
+            <div class="user-info" id="userInfo" style="display: none;">
+                <span id="userName"></span>
+                <button onclick="logout()" class="btn-logout">Cerrar Sesión</button>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-btn active" onclick="showTab('login')">🔐 Inicio</button>
+            <button class="tab-btn" onclick="showTab('register')">📝 Registro</button>
+            <button class="tab-btn" onclick="showTab('incidents')">🚨 Incidentes</button>
+            <button class="tab-btn" onclick="showTab('validation')">✅ Validación</button>
+            <button class="tab-btn" onclick="showTab('monitoring')">📊 Monitoreo</button>
+            <button class="tab-btn" onclick="showTab('routes')">🗺️ Rutas</button>
+        </nav>
+
+        <!-- TAB: LOGIN -->
+        <div id="tab-login" class="tab-content active">
+            <div class="card">
+                <h2>Iniciar Sesión</h2>
+                <form onsubmit="login(event)">
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña:</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Iniciar Sesión</button>
+                </form>
+                <div id="loginMessage" class="message"></div>
+            </div>
+        </div>
+
+        <!-- TAB: REGISTER -->
+        <div id="tab-register" class="tab-content">
+            <div class="card">
+                <h2>Registro de Usuarios</h2>
+                
+                <h3>� Registrar Ciudadano con OTP</h3>
+                <p class="info">Ingresa tu número de teléfono para recibir un código de verificación</p>
+                
+                <form onsubmit="requestCitizenOTP(event)" id="otpRequestForm">
+                    <div class="form-group">
+                        <label>Teléfono (formato E.164):</label>
+                        <input type="tel" id="citizenPhone" placeholder="+593987654321" required>
+                        <small>Ejemplo: +593987654321 (Ecuador)</small>
+                    </div>
+                    <button type="submit" class="btn-primary">📤 Solicitar Código OTP</button>
+                </form>
+                
+                <div id="otpVerifySection" style="display: none;">
+                    <form onsubmit="verifyCitizenOTP(event)">
+                        <div class="form-group">
+                            <label>Código OTP (6 dígitos):</label>
+                            <input type="text" id="otpCode" maxlength="6" pattern="[0-9]{6}" required>
+                        </div>
+                        <button type="submit" class="btn-primary">✅ Verificar Código</button>
+                        <button type="button" onclick="resetOTPForm()" class="btn-secondary">🔄 Solicitar Nuevo Código</button>
+                    </form>
+                </div>
+                
+                <div id="citizenMessage" class="message"></div>
+
+                <hr>
+
+                <h3>👷 Registrar Operador</h3>
+                <form onsubmit="registerOperator(event)">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="operatorName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email:</label>
+                        <input type="email" id="operatorEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña:</label>
+                        <input type="password" id="operatorPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Zona Asignada:</label>
+                        <input type="text" id="operatorZone" placeholder="URBANO_CENTRAL" required>
+                    </div>
+                    <button type="submit" class="btn-primary">Registrar Operador</button>
+                </form>
+                <div id="operatorMessage" class="message"></div>
+            </div>
+        </div>
+
+        <!-- TAB: INCIDENTS -->
+        <div id="tab-incidents" class="tab-content">
+            <div class="card">
+                <h2>🚨 Reportar Incidente</h2>
+                <p class="info">Debes iniciar sesión como ciudadano para reportar incidentes</p>
+                
+                <form onsubmit="reportIncident(event)">
+                    <div class="form-group">
+                        <label>Tipo de Incidente:</label>
+                        <select id="incidentType" required>
+                            <option value="">Seleccione...</option>
+                            <option value="punto_acopio">📦 Punto de Acopio (10 pts)</option>
+                            <option value="zona_critica">🔴 Zona Crítica (8 pts)</option>
+                            <option value="animal_muerto">🐕 Animal Muerto (6 pts)</option>
+                            <option value="zona_reciclaje">♻️ Zona Reciclaje (3 pts)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Latitud:</label>
+                        <input type="number" step="0.000001" id="incidentLat" value="-0.935" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Longitud:</label>
+                        <input type="number" step="0.000001" id="incidentLon" value="-78.6175" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción:</label>
+                        <textarea id="incidentDescription" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary">📤 Reportar Incidente</button>
+                </form>
+                <div id="incidentMessage" class="message"></div>
+
+                <div class="info-box">
+                    <h4>📍 Coordenadas de Referencia:</h4>
+                    <p><strong>EPAGAL (Depósito):</strong> -0.9364043, -78.6087099</p>
+                    <p><strong>Zona Central:</strong> -0.935, -78.6175</p>
+                    <p><strong>Parque Vicente León:</strong> -0.9321, -78.6132</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: VALIDATION -->
+        <div id="tab-validation" class="tab-content">
+            <div class="card">
+                <h2>✅ Validación de Incidentes</h2>
+                <p class="info">Debes iniciar sesión como operador para validar incidentes</p>
+                
+                <button onclick="loadPendingIncidents()" class="btn-primary">🔄 Cargar Incidentes Pendientes</button>
+                
+                <div id="pendingIncidentsList" class="incidents-list"></div>
+            </div>
+        </div>
+
+        <!-- TAB: MONITORING -->
+        <div id="tab-monitoring" class="tab-content">
+            <div class="card">
+                <h2>📊 Monitoreo de Zonas</h2>
+                
+                <button onclick="loadZoneMetrics()" class="btn-primary">🔄 Actualizar Métricas</button>
+                
+                <div id="zoneMetrics" class="metrics-container"></div>
+            </div>
+        </div>
+
+        <!-- TAB: ROUTES -->
+        <div id="tab-routes" class="tab-content">
+            <div class="card">
+                <h2>🗺️ Rutas Optimizadas</h2>
+                
+                <button onclick="loadRoutes()" class="btn-primary">🔄 Cargar Rutas</button>
+                
+                <div id="routesList" class="routes-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/incidents.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/monitoring.js"></script>
+    <script src="js/routes.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

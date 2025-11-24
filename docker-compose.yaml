@@ -1,7 +1,31 @@
-version: '3.8'
-
 services:
-  # 🗺️ Motor de Rutas - OSRM (Open Source Routing Machine)
+  # ============================================================
+  # 📬 RabbitMQ - Message Broker
+  # ============================================================
+  rabbitmq:
+    build: ./RabbitMQ
+    container_name: latacunga_rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # Puerto AMQP
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: tesis
+      RABBITMQ_DEFAULT_PASS: tesis
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # ============================================================
+  # 🗺️ OSRM - Open Source Routing Machine
+  # ============================================================
   routing-engine:
     image: osrm/osrm-backend
     container_name: latacunga_routing
@@ -9,9 +33,7 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      # Mapea la carpeta local osrm-data al contenedor
       - ./osrm-data:/data
-    # Usa el algoritmo MLD (Multi-Level Dijkstra) para rutas rápidas
     command: "osrm-routed --algorithm mld /data/ecuador-latest.osrm"
     networks:
       - latacunga-network
@@ -22,39 +44,176 @@ services:
       retries: 3
       start_period: 15s
 
-  # 🗄️ Base de Datos PostgreSQL + PostGIS (si necesitas local)
-  # postgres:
-  #   image: postgis/postgis:15-3.3
-  #   container_name: latacunga_postgres
-  #   restart: always
-  #   environment:
-  #     POSTGRES_USER: postgres
-  #     POSTGRES_PASSWORD: postgres
-  #     POSTGRES_DB: latacunga_clean
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   networks:
-  #     - latacunga-network
+  # ============================================================
+  # � Auth Service (Puerto 8080)
+  # ============================================================
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: latacunga_auth
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - DB_URL=postgresql://neondb_owner:npg_jnw3bVupEP5i@ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production-2024
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
-  # 📬 RabbitMQ (si necesitas mensajería)
-  # rabbitmq:
-  #   image: rabbitmq:3-management
-  #   container_name: latacunga_rabbitmq
-  #   restart: always
-  #   ports:
-  #     - "5672:5672"   # Puerto AMQP
-  #     - "15672:15672" # Management UI
-  #   environment:
-  #     RABBITMQ_DEFAULT_USER: admin
-  #     RABBITMQ_DEFAULT_PASS: admin
-  #   networks:
-  #     - latacunga-network
+  # ============================================================
+  # 🚛 Fleet Service (Puerto 8081)
+  # ============================================================
+  fleet-service:
+    build:
+      context: ./fleet-service
+      dockerfile: Dockerfile
+    container_name: latacunga_fleet
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      - SERVER_PORT=8081
+      - DB_HOST=ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech
+      - DB_PORT=5432
+      - DB_USER=neondb_owner
+      - DB_PASSWORD=npg_jnw3bVupEP5i
+      - DB_NAME=neondb
+      - DB_SSLMODE=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+      - EXCHANGE_IDENTITY=city.cleaning.identity
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
+  # ============================================================
+  # 📍 Incident Service (Puerto 8082)
+  # ============================================================
+  incident-service:
+    build:
+      context: ./incident-service
+      dockerfile: Dockerfile
+    container_name: latacunga_incident
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      - PORT=8082
+      - DB_URL=postgresql://neondb_owner:npg_jnw3bVupEP5i@ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production-2024
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================
+  # � Scheduler Service (Puerto 8083)
+  # ============================================================
+  scheduler-service:
+    build:
+      context: ./schedule-service
+      dockerfile: Dockerfile
+    container_name: latacunga_scheduler
+    restart: always
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - DB_URL=postgresql://neondb_owner:npg_jnw3bVupEP5i@ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================
+  # 📦 Operations Service (Puerto 8085)
+  # ============================================================
+  operations-service:
+    build:
+      context: ./operations-service
+      dockerfile: Dockerfile
+    container_name: latacunga_operations
+    restart: always
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - DB_URL=postgresql://neondb_owner:npg_jnw3bVupEP5i@ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8085/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================================
+  # 🗺️ Routing Service (Interno)
+  # ============================================================
+  routing-service:
+    build:
+      context: ./routing-service
+      dockerfile: Dockerfile
+    container_name: latacunga_routing_service
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://neondb_owner:npg_jnw3bVupEP5i@ep-gentle-pond-adcmrdsv-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require
+      - RABBITMQ_URL=amqp://tesis:tesis@rabbitmq:5672/
+      - OSRM_URL=http://routing-engine:5000
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      routing-engine:
+        condition: service_healthy
+    networks:
+      - latacunga-network
+
+# ============================================================
+# Networks y Volumes
+# ============================================================
 networks:
   latacunga-network:
     driver: bridge
 
-# volumes:
-#   postgres-data:
+volumes:
+  rabbitmq-data:

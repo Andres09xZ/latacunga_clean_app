@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -144,4 +145,98 @@ func (h *PlanningHandler) SimulateIncident(c *gin.Context) {
 		status = http.StatusCreated
 	}
 	c.JSON(status, res)
+}
+
+// ListPendingIncidents godoc
+// @Summary Lista todos los incidentes almacenados
+// @Description Obtiene todos los incidentes pendientes guardados en la base de datos del scheduler
+// @Tags Planning
+// @Produce json
+// @Param zone_id query int false "Filtrar por zona"
+// @Param status query string false "Filtrar por estado (PENDING, PROCESSED, ASSIGNED)"
+// @Success 200 {array} models.PendingItem "Lista de incidentes"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/planning/incidents [get]
+func (h *PlanningHandler) ListPendingIncidents(c *gin.Context) {
+	zoneIDStr := c.Query("zone_id")
+	status := c.Query("status")
+
+	var incidents []models.PendingItem
+	var err error
+
+	if zoneIDStr != "" && status != "" {
+		zoneID, _ := strconv.ParseUint(zoneIDStr, 10, 64)
+		incidents, err = h.pendingRepo.FindByZone(uint(zoneID), status)
+	} else if zoneIDStr != "" {
+		zoneID, _ := strconv.ParseUint(zoneIDStr, 10, 64)
+		incidents, err = h.pendingRepo.FindByZone(uint(zoneID), "")
+	} else if status != "" {
+		// FindByStatus no existe, usar FindByZone con 0
+		incidents, err = h.pendingRepo.FindByZone(0, status)
+	} else {
+		// Obtener todos los incidentes (implementar si es necesario)
+		incidents, err = h.pendingRepo.FindByZone(0, "")
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"count": len(incidents),
+		"data":  incidents,
+	})
+}
+
+// ListIncidentsByZone godoc
+// @Summary Lista incidentes agrupados por zona
+// @Description Obtiene todos los incidentes organizados por zone_id
+// @Tags Planning
+// @Produce json
+// @Param status query string false "Filtrar por estado (PENDING, PROCESSING, PROCESSED, ASSIGNED)"
+// @Success 200 {object} map[string]interface{} "Incidentes agrupados por zona"
+// @Failure 500 {object} map[string]string "Error interno del servidor"
+// @Router /api/v1/planning/incidents/by-zone [get]
+func (h *PlanningHandler) ListIncidentsByZone(c *gin.Context) {
+	status := c.Query("status")
+	if status == "" {
+		status = "PENDING" // Default a PENDING
+	}
+
+	// Obtener todas las zonas
+	zones, err := h.repo.ListZones()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error obteniendo zonas: " + err.Error()})
+		return
+	}
+
+	// Agrupar incidentes por zona
+	result := make(map[string]interface{})
+	totalIncidents := 0
+
+	for _, zone := range zones {
+		incidents, err := h.pendingRepo.FindByZone(zone.ID, status)
+		if err != nil {
+			continue
+		}
+
+		if len(incidents) > 0 {
+			result[fmt.Sprintf("zone_%d", zone.ID)] = gin.H{
+				"zone_id":   zone.ID,
+				"zone_name": zone.ZoneName,
+				"count":     len(incidents),
+				"incidents": incidents,
+			}
+			totalIncidents += len(incidents)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":          "success",
+		"total_zones":     len(result),
+		"total_incidents": totalIncidents,
+		"filter_status":   status,
+		"data":            result,
+	})
 }

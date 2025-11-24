@@ -1,0 +1,83 @@
+basePath: /
+host: localhost:8086
+info:
+  contact: {}
+  description: API para obtener rutas optimizadas de limpieza por zona
+  title: Routing Service API
+  version: "1.0"
+paths:
+  /api/v1/routes:
+    get:
+      description: Retorna todas las rutas optimizadas agrupadas por zona
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Rutas optimizadas agrupadas por zona
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Lista todas las rutas optimizadas
+      tags:
+      - Routes
+  /api/v1/routes/zone/{zone_id}:
+    get:
+      description: Retorna la última ruta optimizada para una zona específica con
+        las coordenadas de los puntos
+      parameters:
+      - description: ID de la zona
+        in: path
+        name: zone_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Ruta optimizada con coordenadas
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: ID de zona inválido
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: No se encontró ruta para esta zona
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Error interno del servidor
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Obtiene la ruta optimizada por zona
+      tags:
+      - Routes
+  /health:
+    get:
+      description: Verifica el estado del servicio de routing
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Health check del servicio
+      tags:
+      - Health
+swagger: "2.0"

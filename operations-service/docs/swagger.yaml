@@ -1,0 +1,295 @@
+basePath: /
+definitions:
+  models.CompleteStopRequest:
+    properties:
+      comment:
+        type: string
+      status:
+        allOf:
+        - $ref: '#/definitions/models.StopStatus'
+        enum:
+        - RECOGIDO
+        - NO_RECOGIDO
+    required:
+    - status
+    type: object
+  models.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.FinishOrderRequest:
+    properties:
+      end_latitude:
+        type: number
+      end_longitude:
+        type: number
+    required:
+    - end_latitude
+    - end_longitude
+    type: object
+  models.StartOrderRequest:
+    properties:
+      start_latitude:
+        type: number
+      start_longitude:
+        type: number
+    required:
+    - start_latitude
+    - start_longitude
+    type: object
+  models.StopStatus:
+    enum:
+    - PENDIENTE
+    - RECOGIDO
+    - NO_RECOGIDO
+    type: string
+    x-enum-varnames:
+    - StopStatusPending
+    - StopStatusCollected
+    - StopStatusNotCollected
+  models.SuccessResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+    type: object
+  models.WorkOrderResponse:
+    properties:
+      assigned_at:
+        type: string
+      completed_at:
+        type: string
+      completed_stops:
+        type: integer
+      created_at:
+        type: string
+      driver_id:
+        type: string
+      id:
+        type: string
+      request_id:
+        description: Referencia del Scheduler
+        type: string
+      route_polyline:
+        description: Geometría de OSRM
+        type: string
+      started_at:
+        type: string
+      status:
+        $ref: '#/definitions/models.WorkOrderStatus'
+      stops:
+        items:
+          $ref: '#/definitions/models.WorkOrderStop'
+        type: array
+      total_stops:
+        type: integer
+      truck_plate:
+        type: string
+      updated_at:
+        type: string
+      zone_id:
+        type: integer
+    type: object
+  models.WorkOrderStatus:
+    enum:
+    - ASIGNADA
+    - EN_PROGRESO
+    - COMPLETADA
+    type: string
+    x-enum-varnames:
+    - WorkOrderStatusAssigned
+    - WorkOrderStatusInProgress
+    - WorkOrderStatusCompleted
+  models.WorkOrderStop:
+    properties:
+      address:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      incident_ref_id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      sequence_order:
+        description: Orden de visita
+        type: integer
+      serviced_at:
+        type: string
+      status:
+        $ref: '#/definitions/models.StopStatus'
+      updated_at:
+        type: string
+      work_order_id:
+        type: string
+    type: object
+host: localhost:8085
+info:
+  contact:
+    email: support@latacunga.com
+    name: API Support
+  description: API para gestionar órdenes de trabajo y paradas de recolección
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Operations Service API
+  version: "1.0"
+paths:
+  /api/v1/driver/orders/{id}/finish:
+    post:
+      consumes:
+      - application/json
+      description: Marks a work order as COMPLETADA, validates all stops are processed,
+        and publishes completion event
+      parameters:
+      - description: Work Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: End location
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.FinishOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Finish work order
+      tags:
+      - driver
+  /api/v1/driver/orders/{id}/start:
+    post:
+      consumes:
+      - application/json
+      description: Marks a work order as IN_PROGRESS and records start time
+      parameters:
+      - description: Work Order UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Start location
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.StartOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Start work order
+      tags:
+      - driver
+  /api/v1/driver/orders/active:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the active (ASIGNADA or EN_PROGRESO) work order for a
+        specific driver
+      parameters:
+      - description: Driver UUID
+        in: query
+        name: driver_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.WorkOrderResponse'
+        "204":
+          description: No active orders
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Get active work order for driver
+      tags:
+      - driver
+  /api/v1/driver/stops/{id}/complete:
+    post:
+      consumes:
+      - application/json
+      description: Marks a work order stop as RECOGIDO or NO_RECOGIDO
+      parameters:
+      - description: Stop ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stop completion data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.CompleteStopRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.SuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Complete a stop
+      tags:
+      - driver
+swagger: "2.0"
